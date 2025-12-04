@@ -326,7 +326,7 @@ export default function HomePage() {
               <li>🎧 Custom lobbies for friends & Discord servers</li>
               <li>🏆 Season-based leaderboards & cosmetic rewards</li>
               <li>📈 Profile stats: streaks, win rate, favorite genres</li>
-              <li>🧪 Genre filters & themed battle nights</li>
+              <li>🧪 Coming soon: Genre filters & themed battle nights</li>
             </ul>
             <p
               style={{

@@ -10,7 +10,7 @@ type Phase = "countdown" | "upload" | "results";
 
 type BattleLobbyProps = {
   battleId: string;
-  onLeave?: () => void; // <- make optional
+  onLeave?: () => void;
 };
 
 type Profile = {
@@ -28,16 +28,65 @@ type SubmissionView = {
   isSelf: boolean;
 };
 
+// NEW: lobby-related types
+type Lobby = {
+  id: string;
+  status: string; // 'searching' | 'in_progress' | 'finished'
+  mode: string;
+  min_players: number;
+  max_players: number;
+  created_at: string;
+  ready_at: string | null;
+  force_start: boolean;
+};
+
+type LobbyPlayer = {
+  id: string;
+  lobby_id: string;
+  user_id: string;
+  joined_at: string;
+};
+
+// Helper: decide if lobby should start
+function shouldStartGame(lobby: Lobby | null, playerCount: number): boolean {
+  if (!lobby) return false;
+  if (lobby.status !== "searching") return false;
+
+  // if dev forced start, we start immediately
+  if (lobby.force_start) return true;
+
+  // max players reached
+  if (playerCount >= lobby.max_players) return true;
+
+  // if min players and 3 minutes have passed since ready_at
+  if (lobby.ready_at && playerCount >= lobby.min_players) {
+    const readyTime = new Date(lobby.ready_at).getTime();
+    const THREE_MIN = 3 * 60 * 1000;
+    if (Date.now() - readyTime >= THREE_MIN) return true;
+  }
+
+  return false;
+}
+
 export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // DEBUG: see what battleId is when the component renders
   console.log("BattleLobby mounted with battleId:", battleId);
 
   // "mode" comes from /battles/[id]?mode=ranked or ?mode=custom
   const mode = searchParams.get("mode") ?? "ranked";
   const isRanked = mode !== "custom";
+
+  // NEW: lobby state
+  const [lobby, setLobby] = useState<Lobby | null>(null);
+  const [players, setPlayers] = useState<LobbyPlayer[]>([]);
+  const [lobbyLoading, setLobbyLoading] = useState(true);
+  const [lobbyError, setLobbyError] = useState<string | null>(null);
+  const [matchStarted, setMatchStarted] = useState(false);
+  const [autoStartEta, setAutoStartEta] = useState<number | null>(null);
+  const [debugStarting, setDebugStarting] = useState(false);
+  const [debugError, setDebugError] = useState<string | null>(null);
 
   const [timeLeft, setTimeLeft] = useState<number>(INITIAL_TIME);
   const [phase, setPhase] = useState<Phase>("countdown");
@@ -65,11 +114,177 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const [votedForUserId, setVotedForUserId] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
 
-  // NEW: track when all votes are in
+  // track when all votes are in
   const [allVotesIn, setAllVotesIn] = useState(false);
 
-  // Fetch a random sample when lobby mounts
+  // leaving / penalty state
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+
+  // ───────────────── LOBBY: fetch & realtime ─────────────────
+
+  // Initial lobby + players load
   useEffect(() => {
+    const fetchLobby = async () => {
+      setLobbyLoading(true);
+      setLobbyError(null);
+
+      const { data: lobbyData, error: lobbyErr } = await supabase
+        .from("battle_lobbies")
+        .select("*")
+        .eq("id", battleId)
+        .single();
+
+      if (lobbyErr || !lobbyData) {
+        console.error("Failed to load lobby:", lobbyErr);
+        setLobbyError("Failed to load lobby.");
+        setLobbyLoading(false);
+        return;
+      }
+
+      const lobbyRow = lobbyData as Lobby;
+      setLobby(lobbyRow);
+
+      // If lobby already in progress when you join, start match immediately
+      if (lobbyRow.status === "in_progress") {
+        setMatchStarted(true);
+      }
+
+      const { data: playersData, error: playersErr } = await supabase
+        .from("battle_lobby_players")
+        .select("*")
+        .eq("lobby_id", battleId)
+        .order("joined_at", { ascending: true });
+
+      if (!playersErr && playersData) {
+        setPlayers(playersData as LobbyPlayer[]);
+      }
+
+      setLobbyLoading(false);
+    };
+
+    fetchLobby();
+  }, [battleId]);
+
+  // Realtime updates for lobby + players
+  useEffect(() => {
+    const lobbyChannel = supabase
+      .channel(`battle_lobbies:${battleId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "battle_lobbies",
+          filter: `id=eq.${battleId}`,
+        },
+        (payload) => {
+          setLobby(payload.new as Lobby);
+        }
+      )
+      .subscribe();
+
+    const playersChannel = supabase
+      .channel(`battle_lobby_players:${battleId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "battle_lobby_players",
+          filter: `lobby_id=eq.${battleId}`,
+        },
+        async () => {
+          const { data: playersData } = await supabase
+            .from("battle_lobby_players")
+            .select("*")
+            .eq("lobby_id", battleId)
+            .order("joined_at", { ascending: true });
+
+          if (playersData) {
+            setPlayers(playersData as LobbyPlayer[]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(lobbyChannel);
+      supabase.removeChannel(playersChannel);
+    };
+  }, [battleId]);
+
+  // Decide when to start match + compute auto-start countdown
+  useEffect(() => {
+    if (!lobby) return;
+
+    const playerCount = players.length;
+
+    // auto-start logic
+    if (shouldStartGame(lobby, playerCount) && !matchStarted) {
+      const startMatch = async () => {
+        setMatchStarted(true);
+        setPhase("countdown");
+
+        // mark lobby as in progress (best-effort)
+        await supabase
+          .from("battle_lobbies")
+          .update({ status: "in_progress" })
+          .eq("id", lobby.id);
+      };
+
+      startMatch();
+    }
+
+    // compute time until auto-start (for UI)
+    if (
+      lobby.status === "searching" &&
+      !lobby.force_start &&
+      lobby.ready_at &&
+      playerCount >= lobby.min_players
+    ) {
+      const readyTime = new Date(lobby.ready_at).getTime();
+      const THREE_MIN = 3 * 60 * 1000;
+      const etaMs = readyTime + THREE_MIN - Date.now();
+      setAutoStartEta(etaMs > 0 ? Math.round(etaMs / 1000) : 0);
+    } else {
+      setAutoStartEta(null);
+    }
+  }, [lobby, players, matchStarted]);
+
+  // Debug: force start lobby now (dev only, per-lobby)
+  const handleDebugForceStart = async () => {
+    setDebugError(null);
+    setDebugStarting(true);
+
+    try {
+      const { error } = await supabase.rpc("force_start_battle_lobby", {
+        p_lobby_id: battleId,
+      });
+
+      if (error) {
+        console.error("force_start_battle_lobby error:", error);
+        setDebugError(error.message || "Failed to force start lobby.");
+        return;
+      }
+
+      // Optimistically start the match immediately on the client
+      setMatchStarted(true);
+      setPhase("countdown");
+    } catch (err: any) {
+      console.error("force_start_battle_lobby error:", err);
+      setDebugError(err.message || "Failed to force start lobby.");
+    } finally {
+      setDebugStarting(false);
+    }
+  };
+
+  // ───────────────── SAMPLE FETCH ─────────────────
+
+  // Fetch a random sample when match starts (not just on mount)
+  useEffect(() => {
+    if (!matchStarted) return;
+
     const fetchSample = async () => {
       try {
         setSampleLoading(true);
@@ -98,15 +313,16 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     };
 
     fetchSample();
-  }, []);
+  }, [matchStarted]);
 
-  // Timer countdown
+  // ───────────────── TIMER ─────────────────
+
+  // Only tick timer once match has started
   useEffect(() => {
-    // stop timer once we hit results
+    if (!matchStarted) return;
     if (phase === "results") return;
 
     if (timeLeft <= 0) {
-      // production time over, move to upload-only phase
       if (phase !== "upload") setPhase("upload");
       return;
     }
@@ -116,12 +332,12 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [phase, timeLeft]);
+  }, [phase, timeLeft, matchStarted]);
 
-  // When we hit results, update user stats once (mock "played a battle")
-  // Only for RANKED battles
+  // ───────────────── RANKED STATS UPDATE ─────────────────
+
   useEffect(() => {
-    if (!isRanked) return; // 🚫 no rating updates in custom lobbies
+    if (!isRanked) return;
     if (phase !== "results" || statsUpdated) return;
 
     const updateStats = async () => {
@@ -136,7 +352,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
           return;
         }
 
-        // Load existing profile
         const { data, error } = await supabase
           .from("profiles")
           .select("id, total_battles, win_rate, rating")
@@ -183,7 +398,8 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     updateStats();
   }, [phase, statsUpdated, isRanked]);
 
-  // Load submissions: only one (latest) per user
+  // ───────────────── SUBMISSIONS / VOTING ─────────────────
+
   useEffect(() => {
     if (phase !== "results") return;
     if (!battleId || !battleId.trim()) {
@@ -200,7 +416,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       } = await supabase.auth.getUser();
       const currentUserId = user?.id ?? null;
 
-      // Grab submissions ordered by newest first
       const { data, error } = await supabase
         .from("battle_submissions")
         .select("id, user_id, audio_path, created_at")
@@ -212,7 +427,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         return;
       }
 
-      // Deduplicate by user_id – keep newest row per user
       const seen = new Set<string>();
       const uniqueRows: any[] = [];
       for (const row of data as any[]) {
@@ -241,7 +455,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     loadSubmissions();
   }, [phase, battleId]);
 
-  // NEW: when in results, poll for votes; when all in => go to results page
   useEffect(() => {
     if (phase !== "results") return;
     if (!battleId || !battleId.trim()) return;
@@ -256,7 +469,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         .eq("battle_id", battleId);
 
       if (!error && count != null && !cancelled) {
-        // Rule: we're "done" when number of votes >= number of submissions
         if (count >= submissions.length) {
           setAllVotesIn(true);
           router.push(`/battles/${battleId}/results`);
@@ -264,7 +476,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       }
     };
 
-    // check immediately then every 5s
     checkVotes();
     const interval = setInterval(checkVotes, 5000);
 
@@ -286,7 +497,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const handleUpload = async () => {
     setUploadError(null);
 
-    // ✅ critical: make sure battleId exists before hitting DB
     if (!battleId || !battleId.trim()) {
       console.error("Missing battleId in handleUpload:", battleId);
       setUploadError(
@@ -305,7 +515,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       return;
     }
 
-    const uploadWindowOpen = phase !== "results" && timeLeft > 0;
+    const uploadWindowOpen = matchStarted && phase !== "results" && timeLeft > 0;
 
     if (!uploadWindowOpen) {
       setUploadError("Upload window has closed for this battle.");
@@ -324,11 +534,9 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         throw new Error("You must be logged in to upload.");
       }
 
-      // Path in storage bucket
       const safeName = file.name.replace(/\s+/g, "_");
       const path = `${user.id}/${battleId}/${Date.now()}_${safeName}`;
 
-      // 1) Upload to storage
       const { error: uploadErr } = await supabase.storage
         .from("battle-audio")
         .upload(path, file, {
@@ -344,7 +552,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         return;
       }
 
-      // 2) Record submission in DB
       const { error: insertErr } = await supabase
         .from("battle_submissions")
         .insert({
@@ -362,7 +569,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       }
 
       setUploadDone(true);
-      // Move to results; the submissions effect will load all tracks
       setPhase("results");
     } catch (err: any) {
       console.error("Unexpected upload error:", err);
@@ -408,7 +614,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       });
 
       if (error) {
-        // 23505 is Postgres unique violation (already voted)
         if ((error as any).code === "23505") {
           setVoteError("You already voted in this battle.");
         } else {
@@ -423,7 +628,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     }
   };
 
-  // DEBUG: simulate someone voting for your track
   const handleDebugVoteForSelf = async () => {
     setVoteError(null);
 
@@ -455,7 +659,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
       const { error } = await supabase.from("battle_votes").insert({
         battle_id: battleId,
-        voter_id: user.id, // for testing, we reuse your user as the voter
+        voter_id: user.id,
         submission_user_id: selfSub.user_id,
       });
 
@@ -463,14 +667,77 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         setVoteError(error.message || "Failed to insert debug vote.");
         return;
       }
-
-      // no change to votedForUserId, since this is "someone else" voting for you
     } finally {
       setVoteSubmitting(false);
     }
   };
 
-  const uploadWindowOpen = phase !== "results" && timeLeft > 0;
+  const uploadWindowOpen =
+    matchStarted && phase !== "results" && timeLeft > 0;
+
+  // ───────────────── LEAVE / PENALTY ─────────────────
+
+  const handleLeaveBattle = async () => {
+    setLeaveError(null);
+
+    const shouldPenalize = isRanked && !allVotesIn;
+
+    if (!shouldPenalize) {
+      if (onLeave) onLeave();
+      else router.push("/battles");
+      return;
+    }
+
+    setLeaving(true);
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        if (onLeave) onLeave();
+        else router.push("/battles");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("rating")
+        .eq("id", user.id)
+        .single();
+
+      if (error || !data) {
+        console.error("Failed to load profile for leave penalty:", error);
+        if (onLeave) onLeave();
+        else router.push("/battles");
+        return;
+      }
+
+      const prevRating: number = data.rating ?? 0;
+      const newRating = Math.max(prevRating - 50, 0);
+
+      await supabase
+        .from("profiles")
+        .update({
+          rating: newRating,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+    } catch (err) {
+      console.error("Leave penalty error:", err);
+      setLeaveError(
+        "Something went wrong applying your leave penalty, but you have left the battle."
+      );
+    } finally {
+      setLeaving(false);
+      if (onLeave) onLeave();
+      else router.push("/battles");
+    }
+  };
+
+  // ───────────────── RENDER ─────────────────
 
   return (
     <div className="card">
@@ -484,15 +751,104 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
           : "This is a custom, unranked lobby. Results here will not change your rating or rank."}
       </p>
 
+      {/* LOBBY INFO */}
+      <div className="sample-box" style={{ marginBottom: 16 }}>
+        <h3>Lobby status</h3>
+        {lobbyLoading && <p>Loading lobby...</p>}
+        {lobbyError && (
+          <p style={{ color: "#f97373" }}>{lobbyError}</p>
+        )}
+        {!lobbyLoading && !lobbyError && lobby && (
+          <>
+            <p>
+              Players in lobby: {players.length} / {lobby.max_players}
+            </p>
+            {lobby.status === "searching" && !matchStarted && (
+              <>
+                <p>
+                  Waiting for at least {lobby.min_players} players to
+                  start.
+                </p>
+                {players.length < lobby.min_players && (
+                  <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
+                    The battle will automatically start once{" "}
+                    {lobby.min_players} players have joined (up to{" "}
+                    {lobby.max_players}).
+                  </p>
+                )}
+                {players.length >= lobby.min_players && (
+                  <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
+                    Minimum players reached. Looking for more players for
+                    up to 3 minutes{" "}
+                    {autoStartEta != null
+                      ? `(~${autoStartEta}s until auto-start)`
+                      : ""}
+                    .
+                  </p>
+                )}
+              </>
+            )}
+            {matchStarted && (
+              <p style={{ fontSize: "0.9rem", color: "#22c55e" }}>
+                Battle has started!
+              </p>
+            )}
+          </>
+        )}
+
+        {/* Debug: force start lobby with just you */}
+        {lobby &&
+          lobby.status === "searching" &&
+          !matchStarted && (
+            <div style={{ marginTop: 8 }}>
+              <button
+                onClick={handleDebugForceStart}
+                className="btn-secondary"
+                disabled={debugStarting}
+              >
+                {debugStarting
+                  ? "Forcing start..."
+                  : "Debug: Force start lobby (start with current players)"}
+              </button>
+              {debugError && (
+                <p
+                  style={{ color: "#f97373", marginTop: 4, fontSize: 12 }}
+                >
+                  {debugError}
+                </p>
+              )}
+              <p
+                style={{
+                  marginTop: 4,
+                  fontSize: "0.75rem",
+                  color: "#9ca3af",
+                }}
+              >
+                Dev-only: instantly starts the battle even if there are
+                fewer than 3 players.
+              </p>
+            </div>
+          )}
+      </div>
+
       {/* TIMER */}
-      {phase !== "results" && (
+      {matchStarted && phase !== "results" && (
         <p className="highlight">
           Time left to produce: {minutes}:{seconds}
         </p>
       )}
 
+      {/* BEFORE MATCH STARTS */}
+      {!matchStarted && (
+        <p style={{ marginBottom: 12 }}>
+          Waiting for enough players to start the battle. Once the battle
+          starts, you&apos;ll get a sample and a 10-minute timer to make
+          your beat.
+        </p>
+      )}
+
       {/* COUNTDOWN & UPLOAD PHASES */}
-      {(phase === "countdown" || phase === "upload") && (
+      {matchStarted && (phase === "countdown" || phase === "upload") && (
         <>
           <p>
             Open FL Studio on your computer and use the sample below to
@@ -603,7 +959,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       )}
 
       {/* RESULTS PHASE */}
-      {phase === "results" && (
+      {matchStarted && phase === "results" && (
         <>
           <p className="highlight">Results / Voting</p>
           <p>
@@ -648,7 +1004,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
                           gap: 8,
                         }}
                       >
-                        {/* Only show vote button for OTHER users' tracks */}
                         {!sub.isSelf && (
                           <button
                             onClick={() => handleVote(sub)}
@@ -682,7 +1037,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
               <p style={{ color: "#f97373", marginTop: 6 }}>{voteError}</p>
             )}
 
-            {/* Debug button: simulate a vote for your own track */}
             {submissions.some((s) => s.isSelf) && (
               <button
                 onClick={handleDebugVoteForSelf}
@@ -746,14 +1100,20 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         </>
       )}
 
+      {leaveError && (
+        <p style={{ color: "#f97373", marginTop: 8 }}>{leaveError}</p>
+      )}
+
       <button
-        onClick={() => {
-          if (onLeave) onLeave();
-          else router.push("/battles"); // default behavior: back to battles list
-        }}
+        onClick={handleLeaveBattle}
         className="btn-secondary leave-btn"
+        disabled={leaving}
       >
-        Leave Battle
+        {leaving
+          ? "Leaving..."
+          : isRanked && !allVotesIn
+          ? "Leave Battle (-50 rating)"
+          : "Leave Battle"}
       </button>
     </div>
   );

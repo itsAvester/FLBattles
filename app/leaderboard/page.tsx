@@ -14,6 +14,9 @@ type LeaderProfile = {
 };
 
 export default function LeaderboardPage() {
+  const [user, setUser] = useState<any>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
   const [rows, setRows] = useState<LeaderProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -21,31 +24,43 @@ export default function LeaderboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searching, setSearching] = useState(false);
 
-  // Load default top 100 on first mount (no search)
+  // --------------------------
+  // AUTH CHECK
+  // --------------------------
   useEffect(() => {
+    const check = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) setUser(data.user);
+      setAuthChecked(true);
+    };
+    check();
+  }, []);
+
+  // --------------------------
+  // LOAD LEADERBOARD (only if logged in)
+  // --------------------------
+  useEffect(() => {
+    if (!user) return;
+
     const loadTop = async () => {
       setLoading(true);
-      setErrorMsg(null);
-
       const { data, error } = await supabase
         .from("profiles")
         .select("id, display_name, rating, total_battles, win_rate")
-        .order("rating", { ascending: false})
+        .order("rating", { ascending: false })
         .limit(100);
 
       if (error) {
-        setErrorMsg(error.message || "Failed to load leaderboard.");
+        setErrorMsg(error.message);
         setRows([]);
-        setLoading(false);
-        return;
+      } else {
+        setRows(data ?? []);
       }
-
-      setRows((data as LeaderProfile[]) ?? []);
       setLoading(false);
     };
 
     loadTop();
-  }, []);
+  }, [user]);
 
   const formatRating = (r: number | null) =>
     r === null ? "Unranked" : Math.round(r);
@@ -53,59 +68,74 @@ export default function LeaderboardPage() {
   const formatWinRate = (w: number | null) =>
     w === null ? "—" : `${w.toFixed(1)}%`;
 
-  // Handle search submit
+  // --------------------------
+  // SEARCH
+  // --------------------------
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
 
     const term = searchTerm.trim();
-    setErrorMsg(null);
+    if (!term) return;
 
-    if (!term) {
-      // If the box is cleared, reload default top 100
-      setSearching(false);
-      setLoading(true);
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, display_name, rating, total_battles, win_rate")
-        .order("rating", { ascending: false})
-        .limit(100);
-
-      if (error) {
-        setErrorMsg(error.message || "Failed to load leaderboard.");
-        setRows([]);
-        setLoading(false);
-        return;
-      }
-
-      setRows((data as LeaderProfile[]) ?? []);
-      setLoading(false);
-      return;
-    }
-
-    // Run a name search
     setSearching(true);
     setLoading(true);
 
     const { data, error } = await supabase
       .from("profiles")
       .select("id, display_name, rating, total_battles, win_rate")
-      // search display_name case-insensitively
       .ilike("display_name", `%${term}%`)
-      .order("rating", { ascending: false})
+      .order("rating", { ascending: false })
       .limit(100);
 
     if (error) {
-      setErrorMsg(error.message || "Failed to search players.");
+      setErrorMsg(error.message);
       setRows([]);
-      setLoading(false);
-      return;
+    } else {
+      setRows(data ?? []);
     }
 
-    setRows((data as LeaderProfile[]) ?? []);
     setLoading(false);
   };
 
+  // --------------------------
+  // SHOW LOGIN MESSAGE IF NOT LOGGED IN
+  // --------------------------
+  if (authChecked && !user) {
+    return (
+      <section className="page-inner">
+        <h1>Leaderboard</h1>
+        <p className="page-description" style={{ marginBottom: 24 }}>
+          You must be logged in to view the leaderboard.
+        </p>
+
+        <div style={{ display: "flex", gap: 16 }}>
+          <Link href="/login" className="btn-secondary">
+            Login
+          </Link>
+          <Link href="/signup" className="btn-primary">
+            Create Account
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  // --------------------------
+  // WHILE CHECKING AUTH
+  // --------------------------
+  if (!authChecked) {
+    return (
+      <section className="page-inner">
+        <h1>Leaderboard</h1>
+        <p className="page-description">Checking login status…</p>
+      </section>
+    );
+  }
+
+  // --------------------------
+  // NORMAL LOGGED-IN UI BELOW
+  // --------------------------
   return (
     <section className="page-inner">
       <h1>Leaderboard</h1>
@@ -154,11 +184,7 @@ export default function LeaderboardPage() {
         )}
 
         {!loading && !errorMsg && rows.length === 0 && (
-          <p style={{ padding: "16px" }}>
-            {searching
-              ? "No players matched your search."
-              : "No ranked players yet."}
-          </p>
+          <p style={{ padding: "16px" }}>No ranked players yet.</p>
         )}
 
         {!loading && !errorMsg && rows.length > 0 && (
@@ -177,12 +203,8 @@ export default function LeaderboardPage() {
             >
               <tr>
                 <th style={{ textAlign: "left", padding: "10px 16px" }}>#</th>
-                <th style={{ textAlign: "left", padding: "10px 16px" }}>
-                  Player
-                </th>
-                <th style={{ textAlign: "left", padding: "10px 16px" }}>
-                  Tier
-                </th>
+                <th style={{ textAlign: "left", padding: "10px 16px" }}>Player</th>
+                <th style={{ textAlign: "left", padding: "10px 16px" }}>Tier</th>
                 <th style={{ textAlign: "right", padding: "10px 16px" }}>
                   Rating
                 </th>
@@ -197,35 +219,16 @@ export default function LeaderboardPage() {
 
             <tbody>
               {rows.map((p, idx) => {
-                // Rank is just index in the CURRENT list
                 const rank = idx + 1;
                 const tier: RankTier = computeRankTier(p.rating, rank);
-                const isChampion = tier === "Champion";
-
                 const name =
-                  p.display_name ||
-                  `Producer ${p.id.slice(0, 6).toUpperCase()}`;
+                  p.display_name || `Producer ${p.id.slice(0, 6).toUpperCase()}`;
 
                 return (
-                  <tr
-                    key={p.id}
-                    style={{
-                      borderBottom: "1px solid rgba(148,163,184,0.15)",
-                      background: isChampion
-                        ? "rgba(34,197,94,0.06)"
-                        : "transparent",
-                    }}
-                  >
-                    <td
-                      style={{
-                        padding: "8px 16px",
-                        fontWeight: 600,
-                        width: 40,
-                      }}
-                    >
+                  <tr key={p.id}>
+                    <td style={{ padding: "8px 16px", fontWeight: 600 }}>
                       {rank}
                     </td>
-
                     <td style={{ padding: "8px 16px" }}>
                       <Link
                         href={`/players/${p.id}`}
@@ -237,17 +240,7 @@ export default function LeaderboardPage() {
                         {name}
                       </Link>
                     </td>
-
-                    <td
-                      style={{
-                        padding: "8px 16px",
-                        fontWeight: isChampion ? 600 : 400,
-                        color: isChampion ? "#4ade80" : "#e5e7eb",
-                      }}
-                    >
-                      {tier}
-                    </td>
-
+                    <td style={{ padding: "8px 16px" }}>{tier}</td>
                     <td
                       style={{
                         padding: "8px 16px",
@@ -257,24 +250,10 @@ export default function LeaderboardPage() {
                     >
                       {formatRating(p.rating)}
                     </td>
-
-                    <td
-                      style={{
-                        padding: "8px 16px",
-                        textAlign: "right",
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
+                    <td style={{ padding: "8px 16px", textAlign: "right" }}>
                       {formatWinRate(p.win_rate)}
                     </td>
-
-                    <td
-                      style={{
-                        padding: "8px 16px",
-                        textAlign: "right",
-                        fontVariantNumeric: "tabular-nums",
-                      }}
-                    >
+                    <td style={{ padding: "8px 16px", textAlign: "right" }}>
                       {p.total_battles ?? 0}
                     </td>
                   </tr>

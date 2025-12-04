@@ -19,7 +19,9 @@ body {
   color: #e5e7eb;
 }
 
-/* Layout */
+/* =========================================================
+   NAVIGATION — POLISHED PROFESSIONAL LOOK
+   ========================================================= */
 
 .nav {
   display: flex;
@@ -33,15 +35,51 @@ body {
   z-index: 10;
 }
 
-.nav a {
-  color: #e5e7eb;
-  text-decoration: none;
-  margin-left: 16px;
-  font-size: 0.95rem;
+/* Proper spacing + animation */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
 }
 
-.nav a:hover {
+/* Base link style */
+.nav-links a {
+  text-decoration: none;
+  color: #e5e7eb;
+  font-size: 0.95rem;
+  font-weight: 500;
+  opacity: 0.85;
+  position: relative;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+/* Hover color + full opacity */
+.nav-links a:hover {
+  opacity: 1;
+  color: #60a5fa;
+}
+
+/* Animated underline (professional subtle gradient) */
+.nav-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 0%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #60a5fa, #34d399);
+  transition: width 0.25s ease;
+}
+
+.nav-links a:hover::after {
+  width: 100%;
+}
+
+/* Active page underline + brighter color (optional, add .active class manually) */
+.nav-links a.active {
   color: #38bdf8;
+  opacity: 1;
 }
 
 .logo {
@@ -49,6 +87,8 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* Layout */
 
 .page {
   padding: 32px 16px 48px;

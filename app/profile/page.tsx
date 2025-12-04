@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
 import { computeRankTier, RankTier } from "../../lib/rankUtils";
 
@@ -323,6 +324,40 @@ export default function ProfilePage() {
             <span style={{ color: "#9ca3af" }}>Global Position:</span>{" "}
             <strong>{formatRankPosition(globalRank)}</strong>
           </p>
+        </div>
+
+        {/* Account security / change password */}
+        <div
+          style={{
+            marginTop: 8,
+            paddingTop: 8,
+            borderTop: "1px solid rgba(148,163,184,0.25)",
+          }}
+        >
+          <h3 style={{ marginBottom: 4 }}>Account Security</h3>
+          <p
+            style={{
+              color: "#9ca3af",
+              fontSize: "0.9rem",
+              marginBottom: 8,
+            }}
+          >
+            Update your password to keep your FL Battles account secure.
+          </p>
+          <Link
+            href="/change-password"
+            className="btn-secondary"
+            style={{
+              padding: "6px 14px",
+              borderRadius: 20,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "0.9rem",
+            }}
+          >
+            Change Password
+          </Link>
         </div>
       </div>
 

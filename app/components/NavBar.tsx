@@ -37,58 +37,22 @@ export default function NavBar() {
   };
 
   return (
-    <nav
-      style={{
-        width: "100%",
-        padding: "12px 24px",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        background: "rgba(15, 23, 42, 0.85)",
-        backdropFilter: "blur(6px)",
-        borderBottom: "1px solid rgba(255,255,255,0.08)",
-      }}
-    >
-      {/* Left side brand */}
-      <Link
-        href="/"
-        style={{
-          fontSize: "1.25rem",
-          fontWeight: 700,
-          color: "#e2e8f0",
-          textDecoration: "none",
-        }}
-      >
+    <nav className="nav">
+      {/* LEFT: BRAND */}
+      <Link href="/" className="logo" style={{ textDecoration: "none", color: "#e2e8f0" }}>
         FL BATTLES
       </Link>
 
-      {/* Right side nav */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "18px",
-          fontSize: "0.95rem",
-        }}
-      >
-        <Link href="/battles" style={{ color: "#e2e8f0" }}>
-          Battles
-        </Link>
-
-        <Link href="/leaderboard" style={{ color: "#e2e8f0" }}>
-          Leaderboard
-        </Link>
-
-        <Link href="/profile" style={{ color: "#e2e8f0" }}>
-          Profile
-        </Link>
-        <Link href= "/faq"style={{ color: "#e2e8f0" }}>
-          FAQ
-        </Link>
+      {/* RIGHT: NAV LINKS */}
+      <div className="nav-links">
+        <Link href="/battles">Battles</Link>
+        <Link href="/leaderboard">Leaderboard</Link>
+        <Link href="/profile">Profile</Link>
+        <Link href="/faq">FAQ</Link>
 
         {/* Auth Status */}
         {loading ? (
-          <span style={{ color: "#94a3b8" }}>...</span>
+          <span style={{ color: "#94a3b8", fontSize: "0.85rem" }}>...</span>
         ) : user ? (
           <>
             <span style={{ color: "#94a3b8", fontSize: "0.85rem" }}>
@@ -113,6 +77,7 @@ export default function NavBar() {
         ) : (
           <Link
             href="/login"
+            className="btn-secondary"
             style={{
               padding: "6px 14px",
               borderRadius: 20,

@@ -28,7 +28,6 @@ type SubmissionView = {
   isSelf: boolean;
 };
 
-// NEW: lobby-related types
 type Lobby = {
   id: string;
   status: string; // 'searching' | 'in_progress' | 'finished'
@@ -38,6 +37,8 @@ type Lobby = {
   created_at: string;
   ready_at: string | null;
   force_start: boolean;
+  // universal match timer
+  battle_started_at: string | null;
 };
 
 type LobbyPlayer = {
@@ -52,13 +53,13 @@ function shouldStartGame(lobby: Lobby | null, playerCount: number): boolean {
   if (!lobby) return false;
   if (lobby.status !== "searching") return false;
 
-  // if dev forced start, we start immediately
+  // if debug flag is set in DB (in the future), start now
   if (lobby.force_start) return true;
 
   // max players reached
   if (playerCount >= lobby.max_players) return true;
 
-  // if min players and 3 minutes have passed since ready_at
+  // min players reached + 3 minute search window
   if (lobby.ready_at && playerCount >= lobby.min_players) {
     const readyTime = new Date(lobby.ready_at).getTime();
     const THREE_MIN = 3 * 60 * 1000;
@@ -74,11 +75,10 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
   console.log("BattleLobby mounted with battleId:", battleId);
 
-  // "mode" comes from /battles/[id]?mode=ranked or ?mode=custom
   const mode = searchParams.get("mode") ?? "ranked";
   const isRanked = mode !== "custom";
 
-  // NEW: lobby state
+  // lobby state
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
   const [lobbyLoading, setLobbyLoading] = useState(true);
@@ -88,8 +88,12 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const [debugStarting, setDebugStarting] = useState(false);
   const [debugError, setDebugError] = useState<string | null>(null);
 
+  // timer / phase
   const [timeLeft, setTimeLeft] = useState<number>(INITIAL_TIME);
   const [phase, setPhase] = useState<Phase>("countdown");
+
+  // LOCAL debug start time (used only when you hit the debug button)
+  const [debugStartTime, setDebugStartTime] = useState<string | null>(null);
 
   // sample state
   const [sampleName, setSampleName] = useState<string | null>(null);
@@ -114,16 +118,14 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const [votedForUserId, setVotedForUserId] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
 
-  // track when all votes are in
   const [allVotesIn, setAllVotesIn] = useState(false);
 
-  // leaving / penalty state
+  // leaving / penalty
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
   // ───────────────── LOBBY: fetch & realtime ─────────────────
 
-  // Initial lobby + players load
   useEffect(() => {
     const fetchLobby = async () => {
       setLobbyLoading(true);
@@ -145,8 +147,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       const lobbyRow = lobbyData as Lobby;
       setLobby(lobbyRow);
 
-      // If lobby already in progress when you join, start match immediately
-      if (lobbyRow.status === "in_progress") {
+      if (lobbyRow.status === "in_progress" && lobbyRow.battle_started_at) {
         setMatchStarted(true);
       }
 
@@ -166,7 +167,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     fetchLobby();
   }, [battleId]);
 
-  // Realtime updates for lobby + players
+  // Realtime subscriptions for lobby + players
   useEffect(() => {
     const lobbyChannel = supabase
       .channel(`battle_lobbies:${battleId}`)
@@ -179,7 +180,11 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
           filter: `id=eq.${battleId}`,
         },
         (payload) => {
-          setLobby(payload.new as Lobby);
+          const updated = payload.new as Lobby;
+          setLobby(updated);
+          if (updated.status === "in_progress" && updated.battle_started_at) {
+            setMatchStarted(true);
+          }
         }
       )
       .subscribe();
@@ -220,23 +225,33 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
     const playerCount = players.length;
 
-    // auto-start logic
-    if (shouldStartGame(lobby, playerCount) && !matchStarted) {
+    // If conditions are met to start the game and it hasn't started yet,
+    // write the start to the DB (sets a universal battle_started_at).
+    // (This is for real queues, not debug.)
+    if (shouldStartGame(lobby, playerCount) && !lobby.battle_started_at) {
       const startMatch = async () => {
-        setMatchStarted(true);
-        setPhase("countdown");
+        try {
+          const { error } = await supabase
+            .from("battle_lobbies")
+            .update({
+              status: "in_progress",
+              battle_started_at: new Date().toISOString(),
+            })
+            .eq("id", lobby.id)
+            .is("battle_started_at", null); // don't overwrite if already set
 
-        // mark lobby as in progress (best-effort)
-        await supabase
-          .from("battle_lobbies")
-          .update({ status: "in_progress" })
-          .eq("id", lobby.id);
+          if (error) {
+            console.error("Failed to update lobby to in_progress:", error);
+          }
+        } catch (err) {
+          console.error("startMatch unexpected error:", err);
+        }
       };
 
       startMatch();
     }
 
-    // compute time until auto-start (for UI)
+    // compute time until auto-start (for display)
     if (
       lobby.status === "searching" &&
       !lobby.force_start &&
@@ -250,29 +265,30 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     } else {
       setAutoStartEta(null);
     }
-  }, [lobby, players, matchStarted]);
+  }, [lobby, players]);
 
-  // Debug: force start lobby now (dev only, per-lobby)
+  // Debug: force start lobby on THIS CLIENT ONLY
+  // (Does not rely on DB or RPC. Perfect for solo dev testing.)
   const handleDebugForceStart = async () => {
     setDebugError(null);
     setDebugStarting(true);
 
     try {
-      const { error } = await supabase.rpc("force_start_battle_lobby", {
-        p_lobby_id: battleId,
-      });
-
-      if (error) {
-        console.error("force_start_battle_lobby error:", error);
-        setDebugError(error.message || "Failed to force start lobby.");
-        return;
-      }
-
-      // Optimistically start the match immediately on the client
+      const nowIso = new Date().toISOString();
+      setDebugStartTime(nowIso);
       setMatchStarted(true);
-      setPhase("countdown");
+
+      // Locally mark lobby as in_progress so the UI shows started
+      setLobby((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "in_progress",
+            }
+          : prev
+      );
     } catch (err: any) {
-      console.error("force_start_battle_lobby error:", err);
+      console.error("Debug force start error:", err);
       setDebugError(err.message || "Failed to force start lobby.");
     } finally {
       setDebugStarting(false);
@@ -281,7 +297,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
   // ───────────────── SAMPLE FETCH ─────────────────
 
-  // Fetch a random sample when match starts (not just on mount)
+  // When match has started, fetch a random sample
   useEffect(() => {
     if (!matchStarted) return;
 
@@ -315,24 +331,45 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     fetchSample();
   }, [matchStarted]);
 
-  // ───────────────── TIMER ─────────────────
+  // ───────────────── UNIVERSAL / DEBUG TIMER ─────────────────
 
-  // Only tick timer once match has started
+  // If lobby has a real battle_started_at, that's authoritative.
   useEffect(() => {
-    if (!matchStarted) return;
+    if (lobby?.battle_started_at) {
+      setMatchStarted(true);
+    }
+  }, [lobby?.battle_started_at]);
+
+  // Compute timeLeft from:
+  // 1) lobby.battle_started_at (real universal timer), OR
+  // 2) debugStartTime (when you hit the debug button)
+  useEffect(() => {
+    const startIso = lobby?.battle_started_at ?? debugStartTime;
+    if (!startIso) return;
     if (phase === "results") return;
 
-    if (timeLeft <= 0) {
-      if (phase !== "upload") setPhase("upload");
-      return;
-    }
+    const startMs = new Date(startIso).getTime();
 
-    const interval = setInterval(() => {
-      setTimeLeft((t) => t - 1);
-    }, 1000);
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - startMs) / 1000);
+      const remaining = INITIAL_TIME - elapsed;
 
+      if (remaining <= 0) {
+        setTimeLeft(0);
+        if (phase !== "upload") {
+          setPhase("upload");
+        }
+        return;
+      }
+
+      setTimeLeft(remaining);
+    };
+
+    // run once immediately
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [phase, timeLeft, matchStarted]);
+  }, [lobby?.battle_started_at, debugStartTime, phase]);
 
   // ───────────────── RANKED STATS UPDATE ─────────────────
 
@@ -679,57 +716,70 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
   const handleLeaveBattle = async () => {
     setLeaveError(null);
-
-    const shouldPenalize = isRanked && !allVotesIn;
-
-    if (!shouldPenalize) {
-      if (onLeave) onLeave();
-      else router.push("/battles");
-      return;
-    }
-
     setLeaving(true);
 
+    // only penalize if ranked AND match actually started AND not all votes in
+    const shouldPenalize = isRanked && matchStarted && !allVotesIn;
+
     try {
+      // 1) Get current user
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError || !user) {
-        if (onLeave) onLeave();
-        else router.push("/battles");
-        return;
+      if (!user || userError) {
+        console.warn("Could not load user when leaving battle:", userError);
+      } else {
+        // 2) ALWAYS remove this user from the lobby so counts stay correct
+        const { error: deleteErr } = await supabase
+          .from("battle_lobby_players")
+          .delete()
+          .eq("lobby_id", battleId)
+          .eq("user_id", user.id);
+
+        if (deleteErr) {
+          console.error("Failed to remove player from lobby:", deleteErr);
+        }
+
+        // 3) If ranked and leaving during/after battle, apply rating penalty
+        if (shouldPenalize) {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("rating")
+            .eq("id", user.id)
+            .single();
+
+          if (!error && data) {
+            const prevRating: number = data.rating ?? 0;
+            const newRating = Math.max(prevRating - 50, 0);
+
+            const { error: updErr } = await supabase
+              .from("profiles")
+              .update({
+                rating: newRating,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", user.id);
+
+            if (updErr) {
+              console.error("Leave penalty update error:", updErr);
+              setLeaveError(
+                "Something went wrong applying your leave penalty, but you have left the battle."
+              );
+            }
+          } else {
+            console.error("Failed to load profile for leave penalty:", error);
+          }
+        }
       }
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("rating")
-        .eq("id", user.id)
-        .single();
-
-      if (error || !data) {
-        console.error("Failed to load profile for leave penalty:", error);
-        if (onLeave) onLeave();
-        else router.push("/battles");
-        return;
-      }
-
-      const prevRating: number = data.rating ?? 0;
-      const newRating = Math.max(prevRating - 50, 0);
-
-      await supabase
-        .from("profiles")
-        .update({
-          rating: newRating,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
     } catch (err) {
-      console.error("Leave penalty error:", err);
-      setLeaveError(
-        "Something went wrong applying your leave penalty, but you have left the battle."
-      );
+      console.error("Leave battle error:", err);
+      if (shouldPenalize) {
+        setLeaveError(
+          "Something went wrong applying your leave penalty, but you have left the battle."
+        );
+      }
     } finally {
       setLeaving(false);
       if (onLeave) onLeave();
@@ -777,15 +827,15 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
                   </p>
                 )}
                 {players.length >= lobby.min_players && (
-                  <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
-                    Minimum players reached. Looking for more players for
-                    up to 3 minutes{" "}
-                    {autoStartEta != null
-                      ? `(~${autoStartEta}s until auto-start)`
-                      : ""}
+  <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
+    Minimum players reached. Looking for more players for up to 3 minutes{" "}
+    {autoStartEta != null && `(~${autoStartEta}s until auto-start)`}
+    .
+  </p>
+)}
+
                     .
-                  </p>
-                )}
+                  
               </>
             )}
             {matchStarted && (
@@ -796,7 +846,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
           </>
         )}
 
-        {/* Debug: force start lobby with just you */}
+        {/* Debug: force start lobby with just you (client-only) */}
         {lobby &&
           lobby.status === "searching" &&
           !matchStarted && (
@@ -824,8 +874,8 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
                   color: "#9ca3af",
                 }}
               >
-                Dev-only: instantly starts the battle even if there are
-                fewer than 3 players.
+                Dev-only: instantly starts the battle on this client even
+                if there are fewer than 3 players.
               </p>
             </div>
           )}
@@ -838,7 +888,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         </p>
       )}
 
-      {/* BEFORE MATCH STARTS */}
       {!matchStarted && (
         <p style={{ marginBottom: 12 }}>
           Waiting for enough players to start the battle. Once the battle
@@ -967,7 +1016,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
             You can only vote once per battle.
           </p>
 
-          {/* Submissions list */}
           <div style={{ marginTop: 16 }}>
             {loadingSubmissions ? (
               <p>Loading submissions...</p>
@@ -1104,17 +1152,19 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         <p style={{ color: "#f97373", marginTop: 8 }}>{leaveError}</p>
       )}
 
+      {/* Leave button: always visible, only penalizes after match start */}
       <button
-        onClick={handleLeaveBattle}
-        className="btn-secondary leave-btn"
-        disabled={leaving}
-      >
-        {leaving
-          ? "Leaving..."
-          : isRanked && !allVotesIn
-          ? "Leave Battle (-50 rating)"
-          : "Leave Battle"}
-      </button>
+  onClick={handleLeaveBattle}
+  className="btn-secondary leave-btn"
+  disabled={leaving}
+>
+  {leaving
+    ? "Leaving..."
+    : isRanked && matchStarted && !allVotesIn
+      ? "Leave Battle (-50 rating)"
+      : "Leave Battle"}
+</button>
+
     </div>
   );
 }

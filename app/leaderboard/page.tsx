@@ -14,9 +14,6 @@ type LeaderProfile = {
 };
 
 export default function LeaderboardPage() {
-  const [user, setUser] = useState<any>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-
   const [rows, setRows] = useState<LeaderProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -25,25 +22,13 @@ export default function LeaderboardPage() {
   const [searching, setSearching] = useState(false);
 
   // --------------------------
-  // AUTH CHECK
+  // LOAD PUBLIC LEADERBOARD
   // --------------------------
   useEffect(() => {
-    const check = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data?.user) setUser(data.user);
-      setAuthChecked(true);
-    };
-    check();
-  }, []);
-
-  // --------------------------
-  // LOAD LEADERBOARD (only if logged in)
-  // --------------------------
-  useEffect(() => {
-    if (!user) return;
-
     const loadTop = async () => {
       setLoading(true);
+      setErrorMsg(null);
+
       const { data, error } = await supabase
         .from("profiles")
         .select("id, display_name, rating, total_battles, win_rate")
@@ -56,11 +41,12 @@ export default function LeaderboardPage() {
       } else {
         setRows(data ?? []);
       }
+
       setLoading(false);
     };
 
     loadTop();
-  }, [user]);
+  }, []);
 
   const formatRating = (r: number | null) =>
     r === null ? "Unranked" : Math.round(r);
@@ -69,17 +55,39 @@ export default function LeaderboardPage() {
     w === null ? "—" : `${w.toFixed(1)}%`;
 
   // --------------------------
-  // SEARCH
+  // PUBLIC SEARCH
   // --------------------------
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
 
     const term = searchTerm.trim();
-    if (!term) return;
+
+    // If search is blank, reload top 100
+    if (!term) {
+      setSearching(false);
+      setLoading(true);
+      setErrorMsg(null);
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, display_name, rating, total_battles, win_rate")
+        .order("rating", { ascending: false })
+        .limit(100);
+
+      if (error) {
+        setErrorMsg(error.message);
+        setRows([]);
+      } else {
+        setRows(data ?? []);
+      }
+
+      setLoading(false);
+      return;
+    }
 
     setSearching(true);
     setLoading(true);
+    setErrorMsg(null);
 
     const { data, error } = await supabase
       .from("profiles")
@@ -98,44 +106,6 @@ export default function LeaderboardPage() {
     setLoading(false);
   };
 
-  // --------------------------
-  // SHOW LOGIN MESSAGE IF NOT LOGGED IN
-  // --------------------------
-  if (authChecked && !user) {
-    return (
-      <section className="page-inner">
-        <h1>Leaderboard</h1>
-        <p className="page-description" style={{ marginBottom: 24 }}>
-          You must be logged in to view the leaderboard.
-        </p>
-
-        <div style={{ display: "flex", gap: 16 }}>
-          <Link href="/login" className="btn-secondary">
-            Login
-          </Link>
-          <Link href="/signup" className="btn-primary">
-            Create Account
-          </Link>
-        </div>
-      </section>
-    );
-  }
-
-  // --------------------------
-  // WHILE CHECKING AUTH
-  // --------------------------
-  if (!authChecked) {
-    return (
-      <section className="page-inner">
-        <h1>Leaderboard</h1>
-        <p className="page-description">Checking login status…</p>
-      </section>
-    );
-  }
-
-  // --------------------------
-  // NORMAL LOGGED-IN UI BELOW
-  // --------------------------
   return (
     <section className="page-inner">
       <h1>Leaderboard</h1>
@@ -143,7 +113,6 @@ export default function LeaderboardPage() {
         Top 100 ranked producers by rating. Search by name to find specific players.
       </p>
 
-      {/* Search bar */}
       <form
         onSubmit={handleSearch}
         style={{
@@ -167,6 +136,7 @@ export default function LeaderboardPage() {
             color: "#e5e7eb",
           }}
         />
+
         <button type="submit" className="btn-secondary">
           {searching ? "Searching..." : "Search"}
         </button>
@@ -203,8 +173,12 @@ export default function LeaderboardPage() {
             >
               <tr>
                 <th style={{ textAlign: "left", padding: "10px 16px" }}>#</th>
-                <th style={{ textAlign: "left", padding: "10px 16px" }}>Player</th>
-                <th style={{ textAlign: "left", padding: "10px 16px" }}>Tier</th>
+                <th style={{ textAlign: "left", padding: "10px 16px" }}>
+                  Player
+                </th>
+                <th style={{ textAlign: "left", padding: "10px 16px" }}>
+                  Tier
+                </th>
                 <th style={{ textAlign: "right", padding: "10px 16px" }}>
                   Rating
                 </th>
@@ -229,6 +203,7 @@ export default function LeaderboardPage() {
                     <td style={{ padding: "8px 16px", fontWeight: 600 }}>
                       {rank}
                     </td>
+
                     <td style={{ padding: "8px 16px" }}>
                       <Link
                         href={`/players/${p.id}`}
@@ -240,7 +215,9 @@ export default function LeaderboardPage() {
                         {name}
                       </Link>
                     </td>
+
                     <td style={{ padding: "8px 16px" }}>{tier}</td>
+
                     <td
                       style={{
                         padding: "8px 16px",
@@ -250,9 +227,11 @@ export default function LeaderboardPage() {
                     >
                       {formatRating(p.rating)}
                     </td>
+
                     <td style={{ padding: "8px 16px", textAlign: "right" }}>
                       {formatWinRate(p.win_rate)}
                     </td>
+
                     <td style={{ padding: "8px 16px", textAlign: "right" }}>
                       {p.total_battles ?? 0}
                     </td>

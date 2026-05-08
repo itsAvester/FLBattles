@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabaseClient";
 import { computeRankTier } from "../../../lib/rankUtils";
@@ -18,9 +18,8 @@ type PlayerProfile = {
 };
 
 export default function PlayerPage() {
-  const router = useRouter();
   const params = useParams<{ id: string }>();
-  const playerId = params.id; // safe in client components
+  const playerId = params.id;
 
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,15 +31,6 @@ export default function PlayerPage() {
 
       setLoading(true);
       setErrorMsg(null);
-
-      // Require auth to view player pages (matches your RLS)
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
-        return;
-      }
 
       const { data, error } = await supabase
         .from("profiles")
@@ -62,7 +52,7 @@ export default function PlayerPage() {
     };
 
     load();
-  }, [playerId, router]);
+  }, [playerId]);
 
   const formatWinRate = (w: number | null) =>
     w == null ? "N/A" : `${w.toFixed(1)}%`;
@@ -119,18 +109,22 @@ export default function PlayerPage() {
         }}
       >
         <h2>Rank</h2>
+
         <p>
           <span style={{ color: "#9ca3af" }}>Tier:</span>{" "}
           <strong>{tier}</strong>
         </p>
+
         <p>
           <span style={{ color: "#9ca3af" }}>Rating:</span>{" "}
           <strong>{formatRating(profile.rating)}</strong>
         </p>
+
         <p>
           <span style={{ color: "#9ca3af" }}>Battles Played:</span>{" "}
           <strong>{profile.total_battles ?? 0}</strong>
         </p>
+
         <p>
           <span style={{ color: "#9ca3af" }}>Win Rate:</span>{" "}
           <strong>{formatWinRate(profile.win_rate)}</strong>
@@ -139,6 +133,7 @@ export default function PlayerPage() {
 
       <div className="card" style={{ marginBottom: 24 }}>
         <h2>Links</h2>
+
         {!hasAnyLink && (
           <p style={{ color: "#9ca3af" }}>
             This player has not added any external links yet.
@@ -164,6 +159,7 @@ export default function PlayerPage() {
                 Spotify
               </a>
             )}
+
             {profile.soundcloud_url && (
               <a
                 href={profile.soundcloud_url}
@@ -174,6 +170,7 @@ export default function PlayerPage() {
                 SoundCloud
               </a>
             )}
+
             {profile.youtube_url && (
               <a
                 href={profile.youtube_url}

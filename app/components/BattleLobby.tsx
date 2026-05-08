@@ -834,7 +834,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   </p>
 )}
 
-                    .
+                    
                   
               </>
             )}
@@ -846,39 +846,8 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
           </>
         )}
 
-        {/* Debug: force start lobby with just you (client-only) */}
-        {lobby &&
-          lobby.status === "searching" &&
-          !matchStarted && (
-            <div style={{ marginTop: 8 }}>
-              <button
-                onClick={handleDebugForceStart}
-                className="btn-secondary"
-                disabled={debugStarting}
-              >
-                {debugStarting
-                  ? "Forcing start..."
-                  : "Debug: Force start lobby (start with current players)"}
-              </button>
-              {debugError && (
-                <p
-                  style={{ color: "#f97373", marginTop: 4, fontSize: 12 }}
-                >
-                  {debugError}
-                </p>
-              )}
-              <p
-                style={{
-                  marginTop: 4,
-                  fontSize: "0.75rem",
-                  color: "#9ca3af",
-                }}
-              >
-                Dev-only: instantly starts the battle on this client even
-                if there are fewer than 3 players.
-              </p>
-            </div>
-          )}
+        
+          
       </div>
 
       {/* TIMER */}

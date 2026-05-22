@@ -22,6 +22,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <NavBar />
         <main className="page">{children}</main>
+        <Analytics />
       </body>
     </html>
   );

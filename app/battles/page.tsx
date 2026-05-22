@@ -21,7 +21,6 @@ export default function BattlesPage() {
     setCreating(mode);
 
     try {
-      // 1) Get the logged-in user from Supabase Auth
       const {
         data: { user },
         error: authError,
@@ -34,7 +33,6 @@ export default function BattlesPage() {
         return;
       }
 
-      // 2) Call the matchmaking function with mode + user id
       const { data, error } = await supabase.rpc("join_battle_lobby", {
         p_mode: mode,
         p_user_id: user.id,
@@ -60,7 +58,6 @@ export default function BattlesPage() {
         return;
       }
 
-      // 3) Go to the lobby using the Supabase lobby id
       router.push(`/battles/${row.out_lobby_id}?mode=${mode}`);
     } catch (err: any) {
       console.error("Unexpected lobby error:", err);
@@ -80,114 +77,282 @@ export default function BattlesPage() {
   };
 
   return (
-    <section className="page-inner">
-      <h1>Battle Hub</h1>
-      <p className="page-description">
-        Choose between ranked battles that affect your rating, or custom lobbies
-        you can invite friends to for unranked practice sessions.
-      </p>
+    <main className="battles-shell">
+      <section className="battles-hero">
+        <div className="page-inner battles-grid">
+          <div className="battles-copy">
+            <div className="eyebrow">
+              <span className="eyebrow-dot" />
+              Battle hub · choose your mode
+            </div>
 
-      {error && (
-        <p style={{ color: "#f97373", marginTop: 8 }}>{error}</p>
-      )}
+            <h1>
+              Enter the
+              <br />
+              Arena
+            </h1>
 
-      <div
-        style={{
-          display: "grid",
-          gap: 24,
-          gridTemplateColumns: "minmax(0, 1fr)",
-        }}
-      >
-        {/* Ranked Battles */}
-        <div className="card">
-          <h2>Ranked Battles</h2>
-          <p style={{ marginTop: 8, maxWidth: 720 }}>
-            Play for points and climb the leaderboard. Ranked battles use a
-            shared sample and affect your rating, tier (Bronze, Silver, Gold,
-            etc.), and global rank.
+            <p className="hero-description">
+              Queue into ranked battles that affect your rating, or create a
+              custom lobby for friends, collabs, and practice rounds.
+            </p>
+
+            {error && <div className="battle-error">{error}</div>}
+
+            <div className="battle-mode-actions">
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleRankedMatch}
+                disabled={creating !== null}
+              >
+                {creating === "ranked"
+                  ? "Finding ranked match..."
+                  : "Find Ranked Match"}
+              </button>
+
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleCustomLobby}
+                disabled={creating !== null}
+              >
+                {creating === "custom"
+                  ? "Creating custom lobby..."
+                  : "Create Custom Lobby"}
+              </button>
+            </div>
+
+            <p className="mini-note">
+              Ranked battles update rating and leaderboard stats. Custom battles
+              are private, unranked, and shareable by URL.
+            </p>
+          </div>
+
+          <div className="battle-window battles-window">
+            <div className="window-topbar">
+              <div className="window-dots">
+                <span />
+                <span />
+                <span />
+              </div>
+              <span className="window-title">MATCHMAKING</span>
+              <span className="window-status">
+                {creating ? "SEARCHING" : "READY"}
+              </span>
+            </div>
+
+            <div className="stats-grid">
+              <div className="stat-box">
+                <strong>10:00</strong>
+                <span>Round timer</span>
+              </div>
+              <div className="stat-box">
+                <strong>3-7</strong>
+                <span>Players</span>
+              </div>
+              <div className="stat-box">
+                <strong>2</strong>
+                <span>Modes</span>
+              </div>
+            </div>
+
+            <div className="sample-panel">
+              <div>
+                <p className="panel-label">Current selection</p>
+                <h3>
+                  {creating === "custom"
+                    ? "Custom Lobby"
+                    : creating === "ranked"
+                      ? "Ranked Queue"
+                      : "Choose Battle Mode"}
+                </h3>
+              </div>
+
+              <div className="sample-badge">
+                {creating ? "Loading" : "Live"}
+              </div>
+            </div>
+
+            <div className="waveform-card">
+              <div className="waveform-header">
+                <span>Queue Signal</span>
+                <span>{creating ? "Syncing" : "Standby"}</span>
+              </div>
+
+              <div className="waveform">
+                <span style={{ height: "30%" }} />
+                <span style={{ height: "50%" }} />
+                <span style={{ height: "36%" }} />
+                <span style={{ height: "68%" }} />
+                <span style={{ height: "44%" }} />
+                <span style={{ height: "78%" }} />
+                <span style={{ height: "54%" }} />
+                <span style={{ height: "90%" }} />
+                <span style={{ height: "64%" }} />
+                <span style={{ height: "82%" }} />
+                <span style={{ height: "48%" }} />
+                <span style={{ height: "74%" }} />
+                <span style={{ height: "58%" }} />
+                <span style={{ height: "86%" }} />
+                <span style={{ height: "42%" }} />
+                <span style={{ height: "66%" }} />
+              </div>
+            </div>
+
+            <div className="task-table">
+              <div className="task-row task-head">
+                <span>Battle mode</span>
+                <span>Status</span>
+                <span>Rating</span>
+              </div>
+
+              <div className="task-row">
+                <span>Ranked Match</span>
+                <span
+                  className={
+                    creating === "ranked"
+                      ? "status running"
+                      : "status complete"
+                  }
+                >
+                  {creating === "ranked" ? "Searching" : "Ready"}
+                </span>
+                <span>Affects rank</span>
+              </div>
+
+              <div className="task-row">
+                <span>Custom Lobby</span>
+                <span
+                  className={
+                    creating === "custom"
+                      ? "status running"
+                      : "status waiting"
+                  }
+                >
+                  {creating === "custom" ? "Creating" : "Optional"}
+                </span>
+                <span>Unranked</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="page-inner battle-options-section">
+        <div className="section-heading">
+          <div className="eyebrow centered">
+            <span className="eyebrow-dot" />
+            Pick your format
+          </div>
+
+          <h2>Ranked pressure or private practice.</h2>
+
+          <p>
+            Both modes use the same fast battle flow: join a lobby, receive the
+            sample, make your beat, upload, and vote.
           </p>
-
-          <ul
-            style={{
-              listStyle: "disc",
-              paddingLeft: "1.5rem",
-              marginTop: 12,
-              display: "grid",
-              gap: 6,
-              color: "#cbd5f5",
-              fontSize: "0.95rem",
-            }}
-          >
-            <li>Join a lobby backed by Supabase (real server-side lobby).</li>
-            <li>All players use the same sample.</li>
-            <li>10 minutes to produce and upload your track.</li>
-            <li>Vote on the submissions and determine the winner.</li>
-            <li>Rating, tier, and stats are updated at the end.</li>
-          </ul>
-
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={handleRankedMatch}
-            disabled={creating !== null}
-            style={{ marginTop: 16 }}
-          >
-            {creating === "ranked"
-              ? "Finding ranked match..."
-              : "Find Ranked Match"}
-          </button>
         </div>
 
-        {/* Custom / Unranked Battles */}
-        <div className="card">
-          <h2>Custom Battles (Unranked)</h2>
-          <p style={{ marginTop: 8, maxWidth: 720 }}>
-            Create a private lobby for friends, collabs, or practice. These
-            battles do <strong>not</strong> affect rating or leaderboard
-            position.
-          </p>
+        <div className="battle-option-grid">
+          <div className="card battle-option-card ranked-card">
+            <span className="card-number">01</span>
 
-          <ul
-            style={{
-              listStyle: "disc",
-              paddingLeft: "1.5rem",
-              marginTop: 12,
-              display: "grid",
-              gap: 6,
-              color: "#cbd5f5",
-              fontSize: "0.95rem",
-            }}
-          >
-            <li>Creates a lobby in Supabase with a shareable URL.</li>
-            <li>Friends can join that exact lobby link.</li>
-            <li>Uses the same 10-minute timer and upload flow.</li>
-            <li>Great for friendly battles and testing.</li>
-          </ul>
+            <div className="battle-card-topline">
+              <p className="panel-label">Competitive mode</p>
+              <span className="sample-badge">Ranked</span>
+            </div>
 
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={handleCustomLobby}
-            disabled={creating !== null}
-            style={{ marginTop: 16 }}
-          >
-            {creating === "custom"
-              ? "Creating custom lobby..."
-              : "Create Custom Lobby"}
-          </button>
+            <h3>Ranked Battles</h3>
 
-          <p
-            style={{
-              marginTop: 10,
-              fontSize: "0.85rem",
-              color: "#9ca3af",
-            }}
-          >
-            Once you&apos;re in the lobby, copy the URL from your browser bar
-            and send it to anyone you want to invite.
-          </p>
+            <p>
+              Play for points and climb the leaderboard. Ranked battles affect
+              your rating, tier, global rank, and profile stats.
+            </p>
+
+            <div className="check-list battle-check-list">
+              <div>
+                <span>✓</span>
+                Real server-side lobby backed by Supabase.
+              </div>
+              <div>
+                <span>✓</span>
+                Everyone flips the same shared sample.
+              </div>
+              <div>
+                <span>✓</span>
+                Ten minutes to produce and upload your track.
+              </div>
+              <div>
+                <span>✓</span>
+                Voting determines the winner and updates stats.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn-primary battle-card-button"
+              onClick={handleRankedMatch}
+              disabled={creating !== null}
+            >
+              {creating === "ranked"
+                ? "Finding ranked match..."
+                : "Find Ranked Match"}
+            </button>
+          </div>
+
+          <div className="card battle-option-card custom-card">
+            <span className="card-number">02</span>
+
+            <div className="battle-card-topline">
+              <p className="panel-label">Private mode</p>
+              <span className="custom-badge">Unranked</span>
+            </div>
+
+            <h3>Custom Battles</h3>
+
+            <p>
+              Create a private lobby for friends, collabs, or practice. These
+              battles do not affect your leaderboard position.
+            </p>
+
+            <div className="check-list battle-check-list">
+              <div>
+                <span>✓</span>
+                Creates a private lobby with a shareable URL.
+              </div>
+              <div>
+                <span>✓</span>
+                Friends can join using the exact lobby link.
+              </div>
+              <div>
+                <span>✓</span>
+                Uses the same timer, upload, and voting flow.
+              </div>
+              <div>
+                <span>✓</span>
+                Best for testing, friendly battles, and Discord sessions.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn-secondary battle-card-button"
+              onClick={handleCustomLobby}
+              disabled={creating !== null}
+            >
+              {creating === "custom"
+                ? "Creating custom lobby..."
+                : "Create Custom Lobby"}
+            </button>
+
+            <p className="battle-card-note">
+              Once you&apos;re in the lobby, copy the URL from your browser bar
+              and send it to anyone you want to invite.
+            </p>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
   );
 }

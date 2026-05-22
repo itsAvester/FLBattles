@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -51,9 +52,9 @@ export default function LoginPage() {
           email,
           password,
         });
+
         if (error) throw error;
 
-        // Auto-create profile row after signup (best-effort)
         if (data.user) {
           try {
             await fetch("/api/create-profile", {
@@ -65,7 +66,7 @@ export default function LoginPage() {
               }),
             });
           } catch {
-            // Non-fatal – profile creation can be handled elsewhere if needed
+            // Non-fatal. Profile creation can be handled elsewhere if needed.
           }
         }
       } else if (mode === "login") {
@@ -73,10 +74,10 @@ export default function LoginPage() {
           email,
           password,
         });
+
         if (error) throw error;
       }
 
-      // On successful login/signup, go to profile
       if (mode === "login" || mode === "signup") {
         router.push("/profile");
       }
@@ -87,6 +88,12 @@ export default function LoginPage() {
     }
   };
 
+  const switchMode = (nextMode: Mode) => {
+    setMode(nextMode);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+  };
+
   return (
     <main
       style={{
@@ -95,6 +102,8 @@ export default function LoginPage() {
         alignItems: "center",
         justifyContent: "center",
         padding: "32px 16px",
+        fontFamily:
+          "var(--font-manrope), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       }}
     >
       <section
@@ -102,6 +111,7 @@ export default function LoginPage() {
         style={{
           maxWidth: 960,
           width: "100%",
+          display: "flex",
           flexDirection: "row",
           alignItems: "stretch",
           gap: 32,
@@ -122,8 +132,8 @@ export default function LoginPage() {
               textTransform: "uppercase",
               letterSpacing: "0.18em",
               fontSize: 11,
-              fontWeight: 600,
-              color: "#60a5fa",
+              fontWeight: 800,
+              color: "var(--orange)",
             }}
           >
             FL Battles · Early Access
@@ -131,9 +141,14 @@ export default function LoginPage() {
 
           <h1
             style={{
-              fontSize: "2.1rem",
-              lineHeight: 1.15,
+              fontFamily:
+                "var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif",
+              fontSize: "2.4rem",
+              lineHeight: 1.05,
+              letterSpacing: "-0.055em",
+              fontWeight: 800,
               margin: 0,
+              color: "var(--text)",
             }}
           >
             {mode === "forgot"
@@ -143,8 +158,9 @@ export default function LoginPage() {
 
           <p
             style={{
-              color: "#9ca3af",
+              color: "var(--muted)",
               fontSize: "0.98rem",
+              lineHeight: 1.7,
               maxWidth: 480,
             }}
           >
@@ -159,9 +175,10 @@ export default function LoginPage() {
               padding: 0,
               marginTop: 8,
               display: mode === "forgot" ? "none" : "grid",
-              gap: 6,
-              fontSize: "0.9rem",
-              color: "#cbd5f5",
+              gap: 8,
+              fontSize: "0.95rem",
+              color: "var(--text)",
+              lineHeight: 1.5,
             }}
           >
             <li>• Earn rating by winning ranked battles.</li>
@@ -169,9 +186,22 @@ export default function LoginPage() {
             <li>• Join custom lobbies with friends.</li>
           </ul>
 
-          <p style={{ marginTop: 16, fontSize: "0.85rem", color: "#6b7280" }}>
+          <p
+            style={{
+              marginTop: 16,
+              fontSize: "0.85rem",
+              color: "var(--muted-2)",
+            }}
+          >
             Just landed here?{" "}
-            <Link href="/" style={{ color: "#60a5fa", textDecoration: "none" }}>
+            <Link
+              href="/"
+              style={{
+                color: "var(--orange)",
+                textDecoration: "none",
+                fontWeight: 800,
+              }}
+            >
               Back to home
             </Link>
           </p>
@@ -184,249 +214,294 @@ export default function LoginPage() {
             flex: 1,
             maxWidth: 420,
             marginTop: 0,
-            borderRadius: 20,
+            padding: 0,
+            overflow: "hidden",
+            borderRadius: 0,
           }}
         >
-          {/* Mode switch (login/signup) */}
+          {/* Mode switch */}
           <div
             style={{
-              display: "flex",
-              background: "rgba(15,23,42,0.9)",
-              borderRadius: 999,
-              padding: 3,
-              marginBottom: 18,
-              border: "1px solid rgba(148,163,184,0.4)",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              background: "rgba(255, 255, 255, 0.025)",
+              borderBottom: "1px solid var(--line)",
             }}
           >
             <button
               type="button"
-              onClick={() => {
-                setMode("login");
-                setErrorMsg(null);
-                setSuccessMsg(null);
-              }}
-              className="btn-secondary"
+              onClick={() => switchMode("login")}
               style={{
-                flex: 1,
-                borderRadius: 999,
+                minHeight: 56,
                 border: "none",
+                borderRight: "1px solid var(--line)",
                 background:
                   mode === "login"
-                    ? "rgba(30,64,175,0.9)"
-                    : "transparent",
-                color: mode === "login" ? "#e5e7eb" : "#9ca3af",
+                    ? "var(--orange)"
+                    : "rgba(255,255,255,0.025)",
+                color: mode === "login" ? "#050505" : "var(--muted)",
                 boxShadow:
                   mode === "login"
-                    ? "0 0 0 1px rgba(191,219,254,0.4)"
+                    ? "0 0 28px rgba(255, 77, 28, 0.24)"
                     : "none",
+                fontFamily:
+                  "var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif",
+                fontSize: "0.76rem",
+                fontWeight: 900,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                cursor: "pointer",
               }}
             >
               Login
             </button>
+
             <button
               type="button"
-              onClick={() => {
-                setMode("signup");
-                setErrorMsg(null);
-                setSuccessMsg(null);
-              }}
-              className="btn-secondary"
+              onClick={() => switchMode("signup")}
               style={{
-                flex: 1,
-                borderRadius: 999,
+                minHeight: 56,
                 border: "none",
                 background:
                   mode === "signup"
-                    ? "rgba(30,64,175,0.9)"
-                    : "transparent",
-                color: mode === "signup" ? "#e5e7eb" : "#9ca3af",
+                    ? "var(--orange)"
+                    : "rgba(255,255,255,0.025)",
+                color: mode === "signup" ? "#050505" : "var(--muted)",
                 boxShadow:
                   mode === "signup"
-                    ? "0 0 0 1px rgba(191,219,254,0.4)"
+                    ? "0 0 28px rgba(255, 77, 28, 0.24)"
                     : "none",
+                fontFamily:
+                  "var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif",
+                fontSize: "0.76rem",
+                fontWeight: 900,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                cursor: "pointer",
               }}
             >
               Sign Up
             </button>
           </div>
 
-          <h2 style={{ margin: "0 0 4px", fontSize: "1.25rem" }}>
-            {mode === "login"
-              ? "Welcome back"
-              : mode === "signup"
-              ? "Create your account"
-              : "Forgot your password?"}
-          </h2>
-          <p
-            className="page-description"
-            style={{ marginBottom: 16, fontSize: "0.9rem" }}
-          >
-            {mode === "login" &&
-              "Enter your details to access your profile and start battling."}
-            {mode === "signup" &&
-              "Sign up with an email and password to start playing ranked battles."}
-            {mode === "forgot" &&
-              "We’ll email you a secure link to set a new password."}
-          </p>
-
-          <form
-            onSubmit={handleSubmit}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {/* Email always shown */}
-            <label
+          <div style={{ padding: 24 }}>
+            <h2
               style={{
-                fontSize: "0.85rem",
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
+                margin: "0 0 8px",
+                fontFamily:
+                  "var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif",
+                fontSize: "1.5rem",
+                lineHeight: 1,
+                letterSpacing: "-0.055em",
+                fontWeight: 800,
+                color: "var(--text)",
               }}
             >
-              <span>Email</span>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                style={{
-                  width: "100%",
-                  padding: "9px 11px",
-                  borderRadius: 8,
-                  border: "1px solid rgba(148,163,184,0.7)",
-                  background: "rgba(15,23,42,0.9)",
-                  color: "#e5e7eb",
-                  fontSize: "0.9rem",
-                  outline: "none",
-                }}
-              />
-            </label>
+              {mode === "login"
+                ? "Welcome back"
+                : mode === "signup"
+                ? "Create your account"
+                : "Forgot your password?"}
+            </h2>
 
-            {/* Password only for login/signup */}
-            {mode !== "forgot" && (
+            <p
+              className="page-description"
+              style={{
+                marginBottom: 18,
+                fontSize: "0.92rem",
+                lineHeight: 1.6,
+                color: "var(--muted)",
+              }}
+            >
+              {mode === "login" &&
+                "Enter your details to access your profile and start battling."}
+              {mode === "signup" &&
+                "Sign up with an email and password to start playing ranked battles."}
+              {mode === "forgot" &&
+                "We’ll email you a secure link to set a new password."}
+            </p>
+
+            <form
+              onSubmit={handleSubmit}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+              }}
+            >
               <label
                 style={{
                   fontSize: "0.85rem",
                   display: "flex",
                   flexDirection: "column",
-                  gap: 4,
+                  gap: 6,
+                  color: "var(--text)",
+                  fontWeight: 700,
                 }}
               >
-                <span>Password</span>
+                <span>Email</span>
                 <input
-                  type="password"
+                  type="email"
                   required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 6 characters"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
                   style={{
                     width: "100%",
-                    padding: "9px 11px",
-                    borderRadius: 8,
-                    border: "1px solid rgba(148,163,184,0.7)",
-                    background: "rgba(15,23,42,0.9)",
-                    color: "#e5e7eb",
-                    fontSize: "0.9rem",
+                    padding: "11px 12px",
+                    borderRadius: 0,
+                    border: "1px solid var(--line-bright)",
+                    background: "rgba(5, 5, 5, 0.85)",
+                    color: "var(--text)",
+                    fontFamily:
+                      "var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif",
+                    fontSize: "0.95rem",
                     outline: "none",
                   }}
                 />
               </label>
-            )}
 
-            {errorMsg && (
-              <p
+              {mode !== "forgot" && (
+                <label
+                  style={{
+                    fontSize: "0.85rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    color: "var(--text)",
+                    fontWeight: 700,
+                  }}
+                >
+                  <span>Password</span>
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="At least 6 characters"
+                    style={{
+                      width: "100%",
+                      padding: "11px 12px",
+                      borderRadius: 0,
+                      border: "1px solid var(--line-bright)",
+                      background: "rgba(5, 5, 5, 0.85)",
+                      color: "var(--text)",
+                      fontFamily:
+                        "var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif",
+                      fontSize: "0.95rem",
+                      outline: "none",
+                    }}
+                  />
+                </label>
+              )}
+
+              {errorMsg && (
+                <p
+                  style={{
+                    color: "#ffd4ca",
+                    border: "1px solid rgba(255, 77, 28, 0.45)",
+                    background: "rgba(255, 77, 28, 0.075)",
+                    fontSize: "0.9rem",
+                    fontWeight: 700,
+                    lineHeight: 1.45,
+                    padding: "10px 12px",
+                    margin: "2px 0 0",
+                  }}
+                >
+                  {errorMsg}
+                </p>
+              )}
+
+              {successMsg && (
+                <p
+                  style={{
+                    color: "#d9ffd0",
+                    border: "1px solid rgba(140, 255, 107, 0.4)",
+                    background: "rgba(140, 255, 107, 0.07)",
+                    fontSize: "0.9rem",
+                    fontWeight: 700,
+                    lineHeight: 1.45,
+                    padding: "10px 12px",
+                    margin: "2px 0 0",
+                  }}
+                >
+                  {successMsg}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={submitting}
                 style={{
-                  color: "#f97373",
-                  fontSize: "0.9rem",
-                  marginTop: 4,
+                  marginTop: 8,
+                  alignSelf: "flex-start",
                 }}
               >
-                {errorMsg}
-              </p>
-            )}
-
-            {successMsg && (
-              <p
-                style={{
-                  color: "#4ade80",
-                  fontSize: "0.9rem",
-                  marginTop: 4,
-                }}
-              >
-                {successMsg}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={submitting}
-              style={{ marginTop: 10, alignSelf: "flex-start" }}
-            >
-              {submitting
-                ? mode === "login"
-                  ? "Logging in..."
+                {submitting
+                  ? mode === "login"
+                    ? "Logging in..."
+                    : mode === "signup"
+                    ? "Creating account..."
+                    : "Sending reset link..."
+                  : mode === "login"
+                  ? "Log In"
                   : mode === "signup"
-                  ? "Creating account..."
-                  : "Sending reset link..."
-                : mode === "login"
-                ? "Log In"
-                : mode === "signup"
-                ? "Create Account"
-                : "Send reset link"}
-            </button>
-
-            {/* Forgot password / back links */}
-            {mode === "login" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("forgot");
-                  setErrorMsg(null);
-                  setSuccessMsg(null);
-                }}
-                style={{
-                  marginTop: 8,
-                  fontSize: "0.78rem",
-                  color: "#60a5fa",
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  textAlign: "left",
-                  cursor: "pointer",
-                }}
-              >
-                Forgot your password?
+                  ? "Create Account"
+                  : "Send Reset Link"}
               </button>
-            )}
 
-            {mode === "forgot" && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("login");
-                  setErrorMsg(null);
-                  setSuccessMsg(null);
-                }}
-                style={{
-                  marginTop: 8,
-                  fontSize: "0.78rem",
-                  color: "#9ca3af",
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  textAlign: "left",
-                  cursor: "pointer",
-                }}
-              >
-                ← Back to login
-              </button>
-            )}
-          </form>
+              {mode === "login" && (
+                <button
+                  type="button"
+                  onClick={() => switchMode("forgot")}
+                  style={{
+                    marginTop: 14,
+                    color: "var(--orange)",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    textAlign: "left",
+                    cursor: "pointer",
+                    fontFamily:
+                      "var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif",
+                    fontSize: "0.78rem",
+                    fontWeight: 900,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    alignSelf: "center",
+                  }}
+                >
+                  Forgot your password?
+                </button>
+              )}
+
+              {mode === "forgot" && (
+                <button
+                  type="button"
+                  onClick={() => switchMode("login")}
+                  style={{
+                    marginTop: 14,
+                    color: "var(--orange)",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    textAlign: "left",
+                    cursor: "pointer",
+                    fontFamily:
+                      "var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif",
+                    fontSize: "0.78rem",
+                    fontWeight: 900,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    alignSelf: "center",
+                  }}
+                >
+                  ← Back to Login
+                </button>
+              )}
+            </form>
+          </div>
         </div>
       </section>
     </main>

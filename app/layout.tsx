@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import NavBar from "./components/NavBar";
 import { Manrope } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next"
 
 const manrope = Manrope({
   subsets: ["latin"],

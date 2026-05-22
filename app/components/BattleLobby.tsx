@@ -124,6 +124,38 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
+  // Reset all per-lobby client state whenever the URL changes to a different lobby.
+  // This prevents a finished lobby's timer/phase/upload state from carrying into a new lobby.
+  useEffect(() => {
+    setLobby(null);
+    setPlayers([]);
+    setMatchStarted(false);
+    setAutoStartEta(null);
+    setDebugStarting(false);
+    setDebugError(null);
+    setTimeLeft(INITIAL_TIME);
+    setPhase("countdown");
+    setDebugStartTime(null);
+    setSampleName(null);
+    setSampleUrl(null);
+    setSampleLoading(true);
+    setSampleError(null);
+    setFile(null);
+    setUploading(false);
+    setUploadError(null);
+    setUploadDone(false);
+    setUpdatingStats(false);
+    setStatsUpdated(false);
+    setSubmissions([]);
+    setLoadingSubmissions(false);
+    setVoteSubmitting(false);
+    setVotedForUserId(null);
+    setVoteError(null);
+    setAllVotesIn(false);
+    setLeaving(false);
+    setLeaveError(null);
+  }, [battleId]);
+
   // ───────────────── LOBBY: fetch & realtime ─────────────────
 
   useEffect(() => {
@@ -144,11 +176,38 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         return;
       }
 
-      const lobbyRow = lobbyData as Lobby;
+      let lobbyRow = lobbyData as Lobby;
+
+      // Defensive cleanup: a lobby in "searching" should never have an old
+      // battle_started_at. If it does, the client would calculate the timer
+      // from that stale timestamp and immediately show 0:00. Clear it.
+      if (lobbyRow.status === "searching" && lobbyRow.battle_started_at) {
+        const { data: cleanedLobby, error: cleanupErr } = await supabase
+          .from("battle_lobbies")
+          .update({
+            battle_started_at: null,
+            force_start: false,
+          })
+          .eq("id", battleId)
+          .eq("status", "searching")
+          .select("*")
+          .single();
+
+        if (cleanupErr) {
+          console.warn("Could not clear stale battle_started_at:", cleanupErr);
+        } else if (cleanedLobby) {
+          lobbyRow = cleanedLobby as Lobby;
+        }
+      }
+
       setLobby(lobbyRow);
 
       if (lobbyRow.status === "in_progress" && lobbyRow.battle_started_at) {
         setMatchStarted(true);
+      } else {
+        setMatchStarted(false);
+        setPhase("countdown");
+        setTimeLeft(INITIAL_TIME);
       }
 
       const { data: playersData, error: playersErr } = await supabase
@@ -182,8 +241,16 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         (payload) => {
           const updated = payload.new as Lobby;
           setLobby(updated);
+
           if (updated.status === "in_progress" && updated.battle_started_at) {
             setMatchStarted(true);
+          } else if (updated.status === "searching") {
+            setMatchStarted(false);
+            setPhase("countdown");
+            setTimeLeft(INITIAL_TIME);
+            setDebugStartTime(null);
+          } else if (updated.status === "finished") {
+            setPhase("results");
           }
         }
       )
@@ -225,20 +292,22 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
     const playerCount = players.length;
 
-    // If conditions are met to start the game and it hasn't started yet,
-    // write the start to the DB (sets a universal battle_started_at).
-    // (This is for real queues, not debug.)
-    if (shouldStartGame(lobby, playerCount) && !lobby.battle_started_at) {
+    // If conditions are met to start the game, write a fresh start time to the DB.
+    // This intentionally keys off status="searching" instead of battle_started_at=null
+    // so a stale timestamp can never cause the new lobby timer to start at 0:00.
+    if (shouldStartGame(lobby, playerCount)) {
       const startMatch = async () => {
         try {
+          const nowIso = new Date().toISOString();
           const { error } = await supabase
             .from("battle_lobbies")
             .update({
               status: "in_progress",
-              battle_started_at: new Date().toISOString(),
+              battle_started_at: nowIso,
+              force_start: false,
             })
             .eq("id", lobby.id)
-            .is("battle_started_at", null); // don't overwrite if already set
+            .eq("status", "searching");
 
           if (error) {
             console.error("Failed to update lobby to in_progress:", error);
@@ -277,6 +346,8 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       const nowIso = new Date().toISOString();
       setDebugStartTime(nowIso);
       setMatchStarted(true);
+      setPhase("countdown");
+      setTimeLeft(INITIAL_TIME);
 
       // Locally mark lobby as in_progress so the UI shows started
       setLobby((prev) =>
@@ -284,6 +355,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
           ? {
               ...prev,
               status: "in_progress",
+              battle_started_at: prev.battle_started_at ?? nowIso,
             }
           : prev
       );
@@ -297,9 +369,12 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
   // ───────────────── SAMPLE FETCH ─────────────────
 
-  // When match has started, fetch a random sample
+  // When match has started, fetch a random sample.
+  // Depend on the start timestamp so a newly started lobby gets a fresh sample,
+  // but ordinary timer ticks do not refetch it.
   useEffect(() => {
-    if (!matchStarted) return;
+    const startIso = lobby?.battle_started_at ?? debugStartTime;
+    if (!matchStarted || !startIso) return;
 
     const fetchSample = async () => {
       try {
@@ -329,24 +404,43 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     };
 
     fetchSample();
-  }, [matchStarted]);
+  }, [matchStarted, lobby?.battle_started_at, debugStartTime]);
 
   // ───────────────── UNIVERSAL / DEBUG TIMER ─────────────────
 
   // If lobby has a real battle_started_at, that's authoritative.
+  // If it is back in searching, reset the local timer state.
   useEffect(() => {
-    if (lobby?.battle_started_at) {
+    if (lobby?.status === "in_progress" && lobby.battle_started_at) {
       setMatchStarted(true);
+      return;
     }
-  }, [lobby?.battle_started_at]);
+
+    if (lobby?.status === "searching") {
+      setMatchStarted(false);
+      setPhase("countdown");
+      setTimeLeft(INITIAL_TIME);
+    }
+  }, [lobby?.status, lobby?.battle_started_at]);
 
   // Compute timeLeft from:
   // 1) lobby.battle_started_at (real universal timer), OR
   // 2) debugStartTime (when you hit the debug button)
   useEffect(() => {
     const startIso = lobby?.battle_started_at ?? debugStartTime;
-    if (!startIso) return;
+
+    if (!startIso) {
+      setTimeLeft(INITIAL_TIME);
+      return;
+    }
+
     if (phase === "results") return;
+
+    // Do not run the timer from an old DB value unless the lobby is actually in progress.
+    if (!debugStartTime && lobby?.status !== "in_progress") {
+      setTimeLeft(INITIAL_TIME);
+      return;
+    }
 
     const startMs = new Date(startIso).getTime();
 
@@ -369,7 +463,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [lobby?.battle_started_at, debugStartTime, phase]);
+  }, [lobby?.status, lobby?.battle_started_at, debugStartTime, phase]);
 
   // ───────────────── RANKED STATS UPDATE ─────────────────
 
@@ -508,6 +602,14 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       if (!error && count != null && !cancelled) {
         if (count >= submissions.length) {
           setAllVotesIn(true);
+
+          // Mark this lobby finished so the queue/RPC logic does not accidentally
+          // reuse it as an active lobby later.
+          await supabase
+            .from("battle_lobbies")
+            .update({ status: "finished" })
+            .eq("id", battleId);
+
           router.push(`/battles/${battleId}/results`);
         }
       }
@@ -547,11 +649,6 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
       return;
     }
 
-    if (uploadDone) {
-      setUploadError("You have already uploaded for this battle.");
-      return;
-    }
-
     const uploadWindowOpen = matchStarted && phase !== "results" && timeLeft > 0;
 
     if (!uploadWindowOpen) {
@@ -571,14 +668,22 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         throw new Error("You must be logged in to upload.");
       }
 
-      const safeName = file.name.replace(/\s+/g, "_");
-      const path = `${user.id}/${battleId}/${Date.now()}_${safeName}`;
+      const safeName = file.name
+        .replace(/[^a-zA-Z0-9._-]/g, "_")
+        .replace(/_+/g, "_");
+      const extension = safeName.includes(".")
+        ? safeName.split(".").pop()
+        : "webm";
+
+      // Stable path per user + battle. This lets a player replace their upload
+      // without creating a second DB row or orphaning new timestamped files.
+      const path = `${user.id}/${battleId}/submission.${extension}`;
 
       const { error: uploadErr } = await supabase.storage
         .from("battle-audio")
         .upload(path, file, {
           cacheControl: "3600",
-          upsert: false,
+          upsert: true,
         });
 
       if (uploadErr) {
@@ -589,18 +694,24 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
         return;
       }
 
-      const { error: insertErr } = await supabase
+      const { error: submissionErr } = await supabase
         .from("battle_submissions")
-        .insert({
-          battle_id: battleId,
-          user_id: user.id,
-          audio_path: path,
-        });
+        .upsert(
+          {
+            battle_id: battleId,
+            user_id: user.id,
+            audio_path: path,
+            created_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "battle_id,user_id",
+          }
+        );
 
-      if (insertErr) {
-        console.error("DB insert error:", insertErr);
+      if (submissionErr) {
+        console.error("DB submission upsert error:", submissionErr);
         setUploadError(
-          `Database error: ${insertErr.message ?? "unknown error"}`
+          `Database error: ${submissionErr.message ?? "unknown error"}`
         );
         return;
       }
@@ -917,8 +1028,8 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
           <div style={{ marginTop: 16 }}>
             <h3>Upload your track</h3>
             <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
-              Accepted: mp3, wav, etc. Max one upload per battle. Upload
-              window closes when the 10 minutes expire.
+              Accepted: mp3, wav, etc. You can replace your upload during
+              the 10-minute window.
             </p>
 
             <input

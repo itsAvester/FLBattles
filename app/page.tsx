@@ -16,6 +16,9 @@ export default function HomePage() {
               10 Minute
               <br />
               Beat Battles
+              <br />
+              BETA
+              <br />
             </h1>
 
             <p className="hero-description">

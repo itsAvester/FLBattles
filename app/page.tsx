@@ -18,7 +18,6 @@ export default function HomePage() {
               Beat Battles
               <br />
               BETA
-              <br />
             </h1>
 
             <p className="hero-description">

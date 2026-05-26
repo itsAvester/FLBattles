@@ -15,7 +15,7 @@ export default function HomePage() {
             <h1>
               10 Minute
               <br />
-              Beat Battles BETA
+              Beat Battles
               <br />
             </h1>
 

@@ -1191,16 +1191,7 @@ useEffect(() => {
               <p style={{ color: "#f97373", marginTop: 6 }}>{voteError}</p>
             )}
 
-            {submissions.some((s) => s.isSelf) && (
-              <button
-                onClick={handleDebugVoteForSelf}
-                className="btn-secondary"
-                style={{ marginTop: 12 }}
-                disabled={voteSubmitting}
-              >
-                Debug: Simulate vote for my track
-              </button>
-            )}
+            
 
             {allVotesIn && (
               <p

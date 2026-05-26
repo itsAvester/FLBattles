@@ -21,6 +21,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={manrope.variable}>
       <body>
         <NavBar />
+        <div className="w-full border-b border-orange-400/40 bg-orange-500/10 px-4 py-2 text-center text-sm font-semibold text-orange-300">
+    🚧 In Beta — FL Battles is still in development. Bugs and changes are expected.
+  </div>
         <main className="page">{children}</main>
         <Analytics />
       </body>

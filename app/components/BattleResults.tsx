@@ -17,6 +17,7 @@ type BattleResultsProps = {
 export default function BattleResults({ battleId }: BattleResultsProps) {
   const [rows, setRows] = useState<ResultRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [winnerUserId, setWinnerUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -27,11 +28,22 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
       } = await supabase.auth.getUser();
       const currentUserId = user?.id ?? null;
 
-      // 1) Get all submissions for this battle
-      const { data: submissions, error: subErr } = await supabase
-        .from("battle_submissions")
-        .select("id, user_id, audio_path")
-        .eq("battle_id", battleId);
+// 0) Get saved winner for this battle
+const { data: lobbyData, error: lobbyErr } = await supabase
+  .from("battle_lobbies")
+  .select("winner_user_id")
+  .eq("id", battleId)
+  .single();
+
+if (!lobbyErr && lobbyData) {
+  setWinnerUserId(lobbyData.winner_user_id);
+}
+
+// 1) Get all submissions for this battle
+const { data: submissions, error: subErr } = await supabase
+  .from("battle_submissions")
+  .select("id, user_id, audio_path")
+  .eq("battle_id", battleId);
 
       if (subErr || !submissions) {
         console.error("Error loading submissions:", subErr);
@@ -105,10 +117,10 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
               style={{ marginBottom: 12 }}
             >
               <h3>
-                {index === 0 ? "🏆 " : ""}
-                {r.isSelf ? "You" : `Producer ${index + 1}`} – {r.votes} vote
-                {r.votes === 1 ? "" : "s"}
-              </h3>
+  {r.user_id === winnerUserId ? "🏆 " : ""}
+  {r.isSelf ? "You" : `Producer ${index + 1}`} – {r.votes} vote
+  {r.votes === 1 ? "" : "s"}
+</h3>
               <audio
                 controls
                 style={{ width: "100%", marginTop: 4 }}

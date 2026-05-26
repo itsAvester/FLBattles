@@ -487,7 +487,7 @@ useEffect(() => {
 
   // ───────────────── RANKED STATS UPDATE ─────────────────
 
-  useEffect(() => {
+ /* useEffect(() => {
     if (!isRanked) return;
     if (phase !== "results" || statsUpdated) return;
 
@@ -548,7 +548,7 @@ useEffect(() => {
 
     updateStats();
   }, [phase, statsUpdated, isRanked]);
-
+*/
   // ───────────────── SUBMISSIONS / VOTING ─────────────────
 
   useEffect(() => {
@@ -621,17 +621,23 @@ useEffect(() => {
 
       if (!error && count != null && !cancelled) {
         if (count >= submissions.length) {
-          setAllVotesIn(true);
+  setAllVotesIn(true);
 
-          // Mark this lobby finished so the queue/RPC logic does not accidentally
-          // reuse it as an active lobby later.
-          await supabase
-            .from("battle_lobbies")
-            .update({ status: "finished" })
-            .eq("id", battleId);
+  const { error: finalizeError } = await supabase.rpc(
+    "finalize_battle_results",
+    {
+      p_battle_id: battleId,
+    }
+  );
 
-          router.push(`/battles/${battleId}/results`);
-        }
+  if (finalizeError) {
+    console.error("Failed to finalize battle:", finalizeError);
+    setVoteError(finalizeError.message || "Failed to finalize battle.");
+    return;
+  }
+
+  router.push(`/battles/${battleId}/results`);
+}
       }
     };
 

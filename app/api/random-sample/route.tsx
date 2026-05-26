@@ -1,36 +1,66 @@
 // app/api/random-sample/route.ts
 import { NextResponse } from "next/server";
-import path from "path";
-import fs from "fs/promises";
+import { createClient } from "@supabase/supabase-js";
+
+export const dynamic = "force-dynamic";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const AUDIO_EXTENSIONS = [".mp3", ".wav", ".ogg", ".flac", ".m4a"];
 
 export async function GET() {
   try {
-    // absolute path to /public/samples
-    const samplesDir = path.join(process.cwd(), "public", "samples");
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json(
+        { error: "Missing Supabase server environment variables" },
+        { status: 500 }
+      );
+    }
 
-    const files = await fs.readdir(samplesDir);
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Only allow common audio extensions
-    const audioFiles = files.filter((file) =>
-      file.match(/\.(mp3|wav|ogg|flac)$/i)
-    );
+    const { data: files, error } = await supabase.storage
+      .from("battle-samples")
+      .list("", {
+        limit: 1000,
+        sortBy: { column: "name", order: "asc" },
+      });
+
+    if (error) {
+      return NextResponse.json(
+        { error: `Failed to list samples: ${error.message}` },
+        { status: 500 }
+      );
+    }
+
+    const audioFiles =
+      files?.filter((file) =>
+        AUDIO_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
+      ) ?? [];
 
     if (audioFiles.length === 0) {
       return NextResponse.json(
-        { error: "No audio samples found in /public/samples" },
+        { error: "No audio samples found in Supabase bucket battle-samples" },
         { status: 500 }
       );
     }
 
     const randomIndex = Math.floor(Math.random() * audioFiles.length);
-    const filename = audioFiles[randomIndex];
-    const url = `/samples/${filename}`;
+    const filename = audioFiles[randomIndex].name;
 
-    return NextResponse.json({ filename, url });
-  } catch (err) {
-    console.error("Error reading samples directory:", err);
+    const { data: publicUrlData } = supabase.storage
+      .from("battle-samples")
+      .getPublicUrl(filename);
+
+    return NextResponse.json({
+      filename,
+      url: publicUrlData.publicUrl,
+    });
+  } catch (err: any) {
+    console.error("Error loading random sample:", err);
     return NextResponse.json(
-      { error: "Failed to read samples directory" },
+      { error: err?.message || "Failed to load random sample" },
       { status: 500 }
     );
   }

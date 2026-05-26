@@ -287,40 +287,17 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   }, [battleId]);
 
   // Decide when to start match + compute auto-start countdown
-  useEffect(() => {
-    if (!lobby) return;
+useEffect(() => {
+  if (!lobby) return;
+
+  let cancelled = false;
+
+  const checkAutoStart = async () => {
+    if (!lobby || cancelled) return;
 
     const playerCount = players.length;
 
-    // If conditions are met to start the game, write a fresh start time to the DB.
-    // This intentionally keys off status="searching" instead of battle_started_at=null
-    // so a stale timestamp can never cause the new lobby timer to start at 0:00.
-    if (shouldStartGame(lobby, playerCount)) {
-      const startMatch = async () => {
-        try {
-          const nowIso = new Date().toISOString();
-          const { error } = await supabase
-            .from("battle_lobbies")
-            .update({
-              status: "in_progress",
-              battle_started_at: nowIso,
-              force_start: false,
-            })
-            .eq("id", lobby.id)
-            .eq("status", "searching");
-
-          if (error) {
-            console.error("Failed to update lobby to in_progress:", error);
-          }
-        } catch (err) {
-          console.error("startMatch unexpected error:", err);
-        }
-      };
-
-      startMatch();
-    }
-
-    // compute time until auto-start (for display)
+    // compute time until auto-start for display
     if (
       lobby.status === "searching" &&
       !lobby.force_start &&
@@ -334,7 +311,50 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
     } else {
       setAutoStartEta(null);
     }
-  }, [lobby, players]);
+
+    // If conditions are met, start the battle
+    if (shouldStartGame(lobby, playerCount)) {
+      try {
+        const nowIso = new Date().toISOString();
+
+        const { data, error } = await supabase
+          .from("battle_lobbies")
+          .update({
+            status: "in_progress",
+            battle_started_at: nowIso,
+            force_start: false,
+          })
+          .eq("id", lobby.id)
+          .eq("status", "searching")
+          .select("*")
+          .single();
+
+        if (error) {
+          console.error("Failed to update lobby to in_progress:", error);
+          return;
+        }
+
+        if (data && !cancelled) {
+          setLobby(data as Lobby);
+          setMatchStarted(true);
+          setPhase("countdown");
+          setTimeLeft(INITIAL_TIME);
+        }
+      } catch (err) {
+        console.error("startMatch unexpected error:", err);
+      }
+    }
+  };
+
+  checkAutoStart();
+
+  const interval = setInterval(checkAutoStart, 1000);
+
+  return () => {
+    cancelled = true;
+    clearInterval(interval);
+  };
+}, [lobby, players.length]);
 
   // Debug: force start lobby on THIS CLIENT ONLY
   // (Does not rely on DB or RPC. Perfect for solo dev testing.)

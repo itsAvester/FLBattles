@@ -21,12 +21,12 @@ export function computeRankTier(
     return "Top 10";
   }
 
-  if (rating >= 1500) return "Champion";
-  if (rating >= 1000) return "Emerald";
-  if (rating >= 800) return "Diamond";
-  if (rating >= 600) return "Platinum";
-  if (rating >= 400) return "Gold";
-  if (rating >= 200) return "Silver";
+  if (rating >= 599) return "Champion";
+  if (rating >= 399) return "Emerald";
+  if (rating >= 299) return "Diamond";
+  if (rating >= 199) return "Platinum";
+  if (rating >= 99) return "Gold";
+  if (rating >= 49) return "Silver";
   // 0–199
   return "Bronze";
 }

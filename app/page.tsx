@@ -59,8 +59,8 @@ export default function HomePage() {
                 <span>Max players</span>
               </div>
               <div className="stat-box">
-                <strong>1500+</strong>
-                <span>Ruby rating</span>
+                <strong>600+</strong>
+                <span>Champion rating</span>
               </div>
             </div>
 
@@ -190,7 +190,7 @@ export default function HomePage() {
             </div>
             <div>
               <span>✓</span>
-              Ranked tiers from Bronze to Ruby so progress feels visible.
+              Ranked tiers from Bronze to Champion so progress feels visible.
             </div>
             <div>
               <span>✓</span>

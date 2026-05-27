@@ -122,7 +122,29 @@ export default function BattlesPage() {
                   : "Create Custom Lobby"}
               </button>
             </div>
+<div className="card" style={{ marginTop: 22, padding: 18 }}>
+  <p className="panel-label" style={{ margin: 0 }}>
+    Community samples
+  </p>
 
+  <h3 style={{ marginTop: 10, marginBottom: 8, color: "var(--text)" }}>
+    Submit a sample for future battles
+  </h3>
+
+  <p style={{ margin: 0, color: "var(--muted)", lineHeight: 1.55 }}>
+    Upload a short audio sample. If approved, it may appear in future beat
+    battles.
+  </p>
+
+  <button
+    type="button"
+    className="btn-secondary"
+    onClick={() => router.push("/samples/submit")}
+    style={{ marginTop: 14 }}
+  >
+    Submit Sample
+  </button>
+</div>
             <p className="mini-note">
               Ranked battles update rating and leaderboard stats. Custom battles
               are private, unranked, and shareable by URL.
@@ -281,7 +303,7 @@ export default function BattlesPage() {
               </div>
               <div>
                 <span>✓</span>
-                Ten minutes to produce and upload your track.
+                Fifteen minutes to produce and upload your track.
               </div>
               <div>
                 <span>✓</span>

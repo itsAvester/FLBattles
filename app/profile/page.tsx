@@ -16,6 +16,12 @@ type ProfileRow = {
   soundcloud_url: string | null;
   youtube_url: string | null;
 };
+type SampleCounts = {
+  pending: number;
+  approved: number;
+  rejected: number;
+  total: number;
+};
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -33,6 +39,12 @@ export default function ProfilePage() {
   const [globalRank, setGlobalRank] = useState<number | null>(null);
   const [rankTier, setRankTier] = useState<RankTier>("Unranked");
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [sampleCounts, setSampleCounts] = useState<SampleCounts>({
+  pending: 0,
+  approved: 0,
+  rejected: 0,
+  total: 0,
+});
 
   const normalizeUrl = (value: string) => {
     const trimmed = value.trim();
@@ -93,9 +105,29 @@ export default function ProfilePage() {
         }
       }
 
-      setGlobalRank(rank);
-      setRankTier(computeRankTier(profileRow.rating, rank));
-      setLoading(false);
+      const { data: sampleRows, error: sampleError } = await supabase
+  .from("sample_submissions")
+  .select("status")
+  .eq("user_id", user.id);
+
+if (!sampleError && sampleRows) {
+  const pending = sampleRows.filter((row) => row.status === "pending").length;
+  const approved = sampleRows.filter((row) => row.status === "approved").length;
+  const rejected = sampleRows.filter((row) => row.status === "rejected").length;
+
+  setSampleCounts({
+    pending,
+    approved,
+    rejected,
+    total: sampleRows.length,
+  });
+} else if (sampleError) {
+  console.error("Failed to load sample submissions:", sampleError);
+}
+
+setGlobalRank(rank);
+setRankTier(computeRankTier(profileRow.rating, rank));
+setLoading(false);
     };
 
     loadProfile();
@@ -576,7 +608,156 @@ export default function ProfilePage() {
               ))}
             </div>
           </div>
+{/* Your Contributions */}
+<div
+  className="card"
+  style={{
+    padding: 26,
+    overflow: "hidden",
+  }}
+>
+  <span className="card-number">04</span>
 
+  <div
+    style={{
+      position: "relative",
+      zIndex: 1,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 14,
+      marginBottom: 18,
+    }}
+  >
+    <p className="panel-label" style={{ margin: 0 }}>
+      Your contributions
+    </p>
+
+    <span className="sample-badge">Samples</span>
+  </div>
+
+  <h2
+    style={{
+      position: "relative",
+      zIndex: 1,
+      margin: "0 0 14px",
+      fontFamily: pageFont,
+      fontSize: "clamp(2rem, 3.4vw, 3rem)",
+      fontWeight: 800,
+      lineHeight: 0.95,
+      letterSpacing: "-0.07em",
+      color: "var(--text)",
+    }}
+  >
+    Submitted Samples
+  </h2>
+
+  <p
+    style={{
+      position: "relative",
+      zIndex: 1,
+      margin: "0 0 18px",
+      color: "var(--muted)",
+      lineHeight: 1.65,
+    }}
+  >
+    Track the samples you have submitted for future FL Battles.
+  </p>
+
+  <div
+    style={{
+      position: "relative",
+      zIndex: 1,
+      display: "grid",
+      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+      gap: 10,
+      marginBottom: 18,
+    }}
+  >
+    {[
+      ["Pending", sampleCounts.pending],
+      ["Approved", sampleCounts.approved],
+      ["Rejected", sampleCounts.rejected],
+    ].map(([label, value]) => (
+      <div
+        key={label}
+        style={{
+          border: "1px solid var(--line)",
+          background: "rgba(255, 255, 255, 0.025)",
+          padding: "14px 12px",
+        }}
+      >
+        <strong
+          style={{
+            display: "block",
+            color: "var(--text)",
+            fontSize: "1.5rem",
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </strong>
+
+        <span
+          style={{
+            display: "block",
+            marginTop: 8,
+            color: "var(--muted)",
+            fontSize: "0.64rem",
+            fontWeight: 900,
+            textTransform: "uppercase",
+            letterSpacing: "0.12em",
+          }}
+        >
+          {label}
+        </span>
+      </div>
+    ))}
+  </div>
+
+  <div
+    style={{
+      position: "relative",
+      zIndex: 1,
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 14,
+      borderTop: "1px solid var(--line)",
+      paddingTop: 16,
+    }}
+  >
+    <div>
+      <p
+        style={{
+          margin: 0,
+          color: "var(--muted)",
+          fontSize: "0.72rem",
+          fontWeight: 900,
+          textTransform: "uppercase",
+          letterSpacing: "0.12em",
+        }}
+      >
+        Total submitted
+      </p>
+
+      <strong
+        style={{
+          display: "block",
+          marginTop: 4,
+          color: "var(--text)",
+          fontSize: "1rem",
+        }}
+      >
+        {sampleCounts.total}
+      </strong>
+    </div>
+
+    <Link href="/samples/submit" className="btn-secondary">
+      Submit New
+    </Link>
+  </div>
+</div>
           {/* Stats */}
           <div
             className="card"

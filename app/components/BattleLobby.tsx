@@ -798,9 +798,9 @@ setLoadingSubmissions(false);
         .eq("battle_id", battleId);
 
       if (!error && count != null && !cancelled) {
-        const requiredVotes = Math.max(submissions.length - 1, 1);
+        const requiredVotes = submissions.length <= 1 ? 0 : submissions.length;
 
-if (count >= requiredVotes) {
+if (submissions.length === 1 || count >= requiredVotes) {
   const { error: finalizeError } = await supabase.rpc(
     "finalize_battle_results",
     {

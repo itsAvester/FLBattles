@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -77,7 +77,39 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
   const mode = searchParams.get("mode") ?? "ranked";
   const isRanked = mode !== "custom";
+const playedStartSoundFor = useRef<string | null>(null);
 
+const playMatchStartSound = () => {
+  try {
+    const AudioContextClass =
+      window.AudioContext || (window as any).webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    const audioCtx = new AudioContextClass();
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    oscillator.type = "sawtooth";
+    oscillator.frequency.setValueAtTime(220, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(
+      880,
+      audioCtx.currentTime + 0.18
+    );
+
+    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, audioCtx.currentTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.35);
+
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.35);
+  } catch (err) {
+    console.warn("Could not play match start sound:", err);
+  }
+};
   // lobby state
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
@@ -91,6 +123,16 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   // timer / phase
   const [timeLeft, setTimeLeft] = useState<number>(INITIAL_TIME);
   const [phase, setPhase] = useState<Phase>("countdown");
+  useEffect(() => {
+  const startKey = lobby?.battle_started_at;
+
+  if (!matchStarted || !startKey) return;
+
+  if (playedStartSoundFor.current === startKey) return;
+
+  playedStartSoundFor.current = startKey;
+  playMatchStartSound();
+}, [matchStarted, lobby?.battle_started_at]);
 
   // LOCAL debug start time (used only when you hit the debug button)
   const [debugStartTime, setDebugStartTime] = useState<string | null>(null);
@@ -644,8 +686,6 @@ useEffect(() => {
 
       if (!error && count != null && !cancelled) {
         if (count >= submissions.length) {
-  setAllVotesIn(true);
-
   const { error: finalizeError } = await supabase.rpc(
     "finalize_battle_results",
     {
@@ -655,10 +695,12 @@ useEffect(() => {
 
   if (finalizeError) {
     console.error("Failed to finalize battle:", finalizeError);
+    setAllVotesIn(false);
     setVoteError(finalizeError.message || "Failed to finalize battle.");
     return;
   }
 
+  setAllVotesIn(true);
   router.push(`/battles/${battleId}/results`);
 }
       }
@@ -699,6 +741,16 @@ useEffect(() => {
     }
 
     const uploadWindowOpen = matchStarted && phase !== "results" && timeLeft > 0;
+
+    const submittedUserIds = new Set(submissions.map((s) => s.user_id));
+
+const uniqueActivePlayers = Array.from(
+  new Map(players.map((p) => [p.user_id, p])).values()
+);
+
+const playersWithoutSubmissions = uniqueActivePlayers.filter(
+  (p) => !submittedUserIds.has(p.user_id)
+);
 
     if (!uploadWindowOpen) {
       setUploadError("Upload window has closed for this battle.");
@@ -947,7 +999,15 @@ useEffect(() => {
       else router.push("/battles");
     }
   };
+const submittedUserIds = new Set(submissions.map((s) => s.user_id));
 
+const uniqueActivePlayers: LobbyPlayer[] = Array.from(
+  new Map(players.map((p) => [p.user_id, p])).values()
+);
+
+const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
+  (p) => !submittedUserIds.has(p.user_id)
+);
   // ───────────────── RENDER ─────────────────
 
   return (
@@ -1208,6 +1268,23 @@ useEffect(() => {
                     </div>
                   );
                 })}
+                {playersWithoutSubmissions.map((player) => (
+  <div
+    key={`missing-${player.user_id}`}
+    className="sample-box"
+    style={{
+      marginBottom: 12,
+      border: "1px solid rgba(249,115,115,0.45)",
+      background: "rgba(127,29,29,0.18)",
+    }}
+  >
+    <h3>Producer did not submit</h3>
+    <p style={{ color: "#fca5a5", marginTop: 4 }}>
+      This player joined the battle but did not upload a beat before the
+      submission window closed.
+    </p>
+  </div>
+))}
               </div>
             )}
 

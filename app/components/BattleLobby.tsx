@@ -296,7 +296,7 @@ useEffect(() => {
   const checkAutoStart = async () => {
     if (!lobby || cancelled) return;
 
-    const playerCount = players.length;
+    const playerCount = new Set(players.map((p) => p.user_id)).size;
 
     // compute time until auto-start for display
     if (
@@ -355,7 +355,7 @@ useEffect(() => {
     cancelled = true;
     clearInterval(interval);
   };
-}, [lobby, players.length]);
+}, [lobby, players]);
 
 // Automatically advance lobby phases while users are in a battle lobby.
 // This keeps lobbies moving from searching → in_progress → voting → finished.
@@ -972,7 +972,7 @@ useEffect(() => {
         {!lobbyLoading && !lobbyError && lobby && (
           <>
             <p>
-              Players in lobby: {players.length} / {lobby.max_players}
+              Players in lobby: {new Set(players.map((p) => p.user_id)).size} / {lobby.max_players}
             </p>
             {lobby.status === "searching" && !matchStarted && (
               <>
@@ -980,14 +980,14 @@ useEffect(() => {
                   Waiting for at least {lobby.min_players} players to
                   start.
                 </p>
-                {players.length < lobby.min_players && (
+                {new Set(players.map((p) => p.user_id)).size < lobby.min_players && (
                   <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
                     The battle will automatically start once{" "}
                     {lobby.min_players} players have joined (up to{" "}
                     {lobby.max_players}).
                   </p>
                 )}
-                {players.length >= lobby.min_players && (
+                {new Set(players.map((p) => p.user_id)).size>= lobby.min_players && (
   <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
     Minimum players reached. Looking for more players for up to 3 minutes{" "}
     {autoStartEta != null && `(~${autoStartEta}s until auto-start)`}

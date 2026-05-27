@@ -249,9 +249,10 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
             setPhase("countdown");
             setTimeLeft(INITIAL_TIME);
             setDebugStartTime(null);
-          } else if (updated.status === "finished") {
-            setPhase("results");
-          }
+          } else if (updated.status === "voting" || updated.status === "finished") {
+  setMatchStarted(true);
+  setPhase("results");
+}
         }
       )
       .subscribe();
@@ -355,6 +356,28 @@ useEffect(() => {
     clearInterval(interval);
   };
 }, [lobby, players.length]);
+
+// Automatically advance lobby phases while users are in a battle lobby.
+// This keeps lobbies moving from searching → in_progress → voting → finished.
+useEffect(() => {
+  if (!battleId) return;
+
+  const advanceLobbies = async () => {
+    const { error } = await supabase.rpc("advance_battle_lobbies");
+
+    if (error) {
+      console.error("Failed to advance battle lobbies:", error);
+    }
+  };
+
+  // Run once immediately when the lobby page loads
+  advanceLobbies();
+
+  // Then run every 10 seconds while the user is on this lobby page
+  const interval = setInterval(advanceLobbies, 10000);
+
+  return () => clearInterval(interval);
+}, [battleId]);
 
   // Debug: force start lobby on THIS CLIENT ONLY
   // (Does not rely on DB or RPC. Perfect for solo dev testing.)
@@ -743,7 +766,8 @@ useEffect(() => {
       }
 
       setUploadDone(true);
-      setPhase("results");
+// Do NOT immediately switch to results.
+// Stay on this screen until the shared lobby status changes to "voting" or "finished".
     } catch (err: any) {
       console.error("Unexpected upload error:", err);
       setUploadError(err.message || "Failed to upload audio.");

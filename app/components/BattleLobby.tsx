@@ -119,6 +119,7 @@ const playMatchStartSound = () => {
   const [autoStartEta, setAutoStartEta] = useState<number | null>(null);
   const [debugStarting, setDebugStarting] = useState(false);
   const [debugError, setDebugError] = useState<string | null>(null);
+  const [missingSubmissionCount, setMissingSubmissionCount] = useState(0);
 
   // timer / phase
   const [timeLeft, setTimeLeft] = useState<number>(INITIAL_TIME);
@@ -642,6 +643,19 @@ useEffect(() => {
         setLoadingSubmissions(false);
         return;
       }
+      const { data: lobbyPlayers, error: playersError } = await supabase
+  .from("battle_lobby_players")
+  .select("user_id")
+  .eq("lobby_id", battleId);
+
+if (playersError) {
+  console.error("Error loading lobby players:", playersError);
+}
+
+const totalPlayers = lobbyPlayers?.length ?? 0;
+const totalSubmissions = data?.length ?? 0;
+
+setMissingSubmissionCount(Math.max(totalPlayers - totalSubmissions, 0));
 
       const seen = new Set<string>();
       const uniqueRows: any[] = [];
@@ -1202,11 +1216,47 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
         <>
           <p className="highlight">Results / Voting</p>
           <p>
-            Listen to all submissions for this battle and cast your vote.
-            You can only vote once per battle.
-          </p>
+  Listen to all submissions for this battle and cast your vote.
+  You can only vote once per battle.
+</p>
 
-          <div style={{ marginTop: 16 }}>
+{missingSubmissionCount > 0 && (
+  <div
+    style={{
+      marginTop: 12,
+      marginBottom: 12,
+      padding: "12px 14px",
+      border: "1px solid rgba(234, 179, 8, 0.45)",
+      background: "rgba(234, 179, 8, 0.12)",
+      color: "#facc15",
+      borderRadius: 12,
+      fontSize: "0.95rem",
+    }}
+  >
+    {missingSubmissionCount === 1
+      ? "1 player did not submit a beat, so they are not included in voting."
+      : `${missingSubmissionCount} players did not submit beats, so they are not included in voting.`}
+  </div>
+)}
+
+{submissions.length === 1 && missingSubmissionCount > 0 && (
+  <div
+    style={{
+      marginTop: 12,
+      marginBottom: 12,
+      padding: "12px 14px",
+      border: "1px solid rgba(34, 197, 94, 0.45)",
+      background: "rgba(34, 197, 94, 0.12)",
+      color: "#22c55e",
+      borderRadius: 12,
+      fontSize: "0.95rem",
+    }}
+  >
+    Only one beat was submitted. This battle should finish without normal voting.
+  </div>
+)}
+
+<div style={{ marginTop: 16 }}>
             {loadingSubmissions ? (
               <p>Loading submissions...</p>
             ) : submissions.length === 0 ? (

@@ -130,6 +130,7 @@ const playMatchStartSound = () => {
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
   const [lobbyLoading, setLobbyLoading] = useState(true);
+  const [playerNamesById, setPlayerNamesById] = useState<Record<string, string>>({});
   const [lobbyError, setLobbyError] = useState<string | null>(null);
   const [matchStarted, setMatchStarted] = useState(false);
   const [autoStartEta, setAutoStartEta] = useState<number | null>(null);
@@ -216,7 +217,32 @@ const playMatchStartSound = () => {
   }, [battleId]);
 
   // ───────────────── LOBBY: fetch & realtime ─────────────────
+const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
+  const userIds = Array.from(new Set(playerRows.map((p) => p.user_id)));
 
+  if (userIds.length === 0) {
+    setPlayerNamesById({});
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, display_name")
+    .in("id", userIds);
+
+  if (error) {
+    console.error("Failed to load player names:", error);
+    return;
+  }
+
+  const nameMap: Record<string, string> = {};
+
+  for (const profile of data ?? []) {
+    nameMap[profile.id] = profile.display_name || "Unnamed Producer";
+  }
+
+  setPlayerNamesById(nameMap);
+};
   useEffect(() => {
     const fetchLobby = async () => {
       setLobbyLoading(true);
@@ -276,8 +302,10 @@ const playMatchStartSound = () => {
         .order("joined_at", { ascending: true });
 
       if (!playersErr && playersData) {
-        setPlayers(playersData as LobbyPlayer[]);
-      }
+  const playerRows = playersData as LobbyPlayer[];
+  setPlayers(playerRows);
+  await loadPlayerNames(playerRows);
+}
 
       setLobbyLoading(false);
     };
@@ -334,8 +362,10 @@ const playMatchStartSound = () => {
             .order("joined_at", { ascending: true });
 
           if (playersData) {
-            setPlayers(playersData as LobbyPlayer[]);
-          }
+  const playerRows = playersData as LobbyPlayer[];
+  setPlayers(playerRows);
+  await loadPlayerNames(playerRows);
+}
         }
       )
       .subscribe();
@@ -1119,6 +1149,32 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
             <p>
               Players in lobby: {new Set(players.map((p) => p.user_id)).size} / {lobby.max_players}
             </p>
+            <div style={{ marginTop: 10, marginBottom: 12 }}>
+  <p style={{ fontSize: "0.9rem", color: "#9ca3af", marginBottom: 6 }}>
+    Players:
+  </p>
+
+  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+    {Array.from(new Map(players.map((p) => [p.user_id, p])).values()).map(
+      (player, index) => (
+        <span
+          key={player.user_id}
+          style={{
+            padding: "6px 10px",
+            borderRadius: 999,
+            border: "1px solid rgba(255,255,255,0.18)",
+            background: "rgba(255,255,255,0.06)",
+            color: "#e5e7eb",
+            fontSize: "0.85rem",
+            fontWeight: 700,
+          }}
+        >
+          {playerNamesById[player.user_id] ?? `Player ${index + 1}`}
+        </span>
+      )
+    )}
+  </div>
+</div>
             {lobby.status === "searching" && !matchStarted && (
               <>
                 <p>

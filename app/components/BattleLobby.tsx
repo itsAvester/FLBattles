@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
 const INITIAL_TIME = 10 * 60; // 10 minutes in seconds
+const QUEUE_READY_TIME = 60; // 60 seconds after min players are reached
 
 type Phase = "countdown" | "upload" | "results";
 
@@ -26,6 +27,7 @@ type SubmissionView = {
   audio_path: string;
   url: string;
   isSelf: boolean;
+  displayName: string;
 };
 
 type Lobby = {
@@ -46,10 +48,11 @@ type LobbyPlayer = {
   lobby_id: string;
   user_id: string;
   joined_at: string;
+  displayName?: string;
 };
 
 // Helper: decide if lobby should start
-function shouldStartGame(lobby: Lobby | null, playerCount: number): boolean {
+/*function shouldStartGame(lobby: Lobby | null, playerCount: number): boolean {
   if (!lobby) return false;
   if (lobby.status !== "searching") return false;
 
@@ -68,7 +71,20 @@ function shouldStartGame(lobby: Lobby | null, playerCount: number): boolean {
 
   return false;
 }
+*/
+function getQueueAutoStartEta(lobby: Lobby | null, playerCount: number): number | null {
+  if (!lobby) return null;
+  if (lobby.status !== "searching") return null;
+  if (lobby.force_start) return 0;
+  if (!lobby.ready_at) return null;
+  if (playerCount < lobby.min_players) return null;
 
+  const readyTime = new Date(lobby.ready_at).getTime();
+  const startTime = readyTime + QUEUE_READY_TIME * 1000;
+  const eta = Math.ceil((startTime - Date.now()) / 1000);
+
+  return Math.max(0, eta);
+}
 export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -331,7 +347,7 @@ const playMatchStartSound = () => {
   }, [battleId]);
 
   // Decide when to start match + compute auto-start countdown
-useEffect(() => {
+/*useEffect(() => {
   if (!lobby) return;
 
   let cancelled = false;
@@ -398,6 +414,25 @@ useEffect(() => {
     cancelled = true;
     clearInterval(interval);
   };
+}, [lobby, players]);*/
+// Compute queue auto-start countdown for display only.
+// Supabase advance_battle_lobbies() is responsible for actually starting the battle.
+useEffect(() => {
+  if (!lobby) {
+    setAutoStartEta(null);
+    return;
+  }
+
+  const tick = () => {
+    const playerCount = new Set(players.map((p) => p.user_id)).size;
+    setAutoStartEta(getQueueAutoStartEta(lobby, playerCount));
+  };
+
+  tick();
+
+  const interval = setInterval(tick, 1000);
+
+  return () => clearInterval(interval);
 }, [lobby, players]);
 
 // Automatically advance lobby phases while users are in a battle lobby.
@@ -657,29 +692,63 @@ const totalSubmissions = data?.length ?? 0;
 
 setMissingSubmissionCount(Math.max(totalPlayers - totalSubmissions, 0));
 
-      const seen = new Set<string>();
-      const uniqueRows: any[] = [];
-      for (const row of data as any[]) {
-        if (seen.has(row.user_id)) continue;
-        seen.add(row.user_id);
-        uniqueRows.push(row);
-      }
+const allUserIds = Array.from(
+  new Set([
+    ...(lobbyPlayers ?? []).map((p: any) => p.user_id),
+    ...(data ?? []).map((s: any) => s.user_id),
+  ])
+);
 
-      const mapped: SubmissionView[] = uniqueRows.map((row) => {
-        const { data: urlData } = supabase.storage
-          .from("battle-audio")
-          .getPublicUrl(row.audio_path);
-        return {
-          id: row.id,
-          user_id: row.user_id,
-          audio_path: row.audio_path,
-          url: urlData.publicUrl,
-          isSelf: currentUserId !== null && row.user_id === currentUserId,
-        };
-      });
+const { data: profilesData } = await supabase
+  .from("profiles")
+  .select("id, display_name")
+  .in("id", allUserIds);
 
-      setSubmissions(mapped);
-      setLoadingSubmissions(false);
+const profileNameById = new Map(
+  (profilesData ?? []).map((profile: any) => [
+    profile.id,
+    profile.display_name || "Unnamed Producer",
+  ])
+);
+
+const lobbyPlayersWithNames: LobbyPlayer[] = (lobbyPlayers ?? []).map(
+  (player: any) => ({
+    ...player,
+    displayName: profileNameById.get(player.user_id) ?? "Unnamed Producer",
+  })
+);
+
+setPlayers(lobbyPlayersWithNames);
+
+const seen = new Set<string>();
+const uniqueRows: any[] = [];
+
+for (const row of data as any[]) {
+  if (seen.has(row.user_id)) continue;
+  seen.add(row.user_id);
+  uniqueRows.push(row);
+}
+
+const mapped: SubmissionView[] = uniqueRows.map((row) => {
+  const { data: urlData } = supabase.storage
+    .from("battle-audio")
+    .getPublicUrl(row.audio_path);
+
+  const displayName =
+    profileNameById.get(row.user_id) ?? "Unnamed Producer";
+
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    audio_path: row.audio_path,
+    url: urlData.publicUrl,
+    isSelf: currentUserId !== null && row.user_id === currentUserId,
+    displayName,
+  };
+});
+
+setSubmissions(mapped);
+setLoadingSubmissions(false);
     };
 
     loadSubmissions();
@@ -699,7 +768,9 @@ setMissingSubmissionCount(Math.max(totalPlayers - totalSubmissions, 0));
         .eq("battle_id", battleId);
 
       if (!error && count != null && !cancelled) {
-        if (count >= submissions.length) {
+        const requiredVotes = Math.max(submissions.length - 1, 1);
+
+if (count >= requiredVotes) {
   const { error: finalizeError } = await supabase.rpc(
     "finalize_battle_results",
     {
@@ -1063,8 +1134,9 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
                 )}
                 {new Set(players.map((p) => p.user_id)).size>= lobby.min_players && (
   <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
-    Minimum players reached. Looking for more players for up to 3 minutes{" "}
-    {autoStartEta != null && `(~${autoStartEta}s until auto-start)`}
+    Minimum players reached. Battle starts 60 seconds after the newest player joins{" "}
+{autoStartEta != null && `(~${autoStartEta}s until auto-start)`}
+
     .
   </p>
 )}
@@ -1265,8 +1337,8 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
               <div className="results-list">
                 {submissions.map((sub, index) => {
                   const label = sub.isSelf
-                    ? "You"
-                    : `Producer ${index + 1}`;
+  ? `You (${sub.displayName})`
+  : sub.displayName;
 
                   const isVoted = votedForUserId === sub.user_id;
 
@@ -1328,10 +1400,10 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
       background: "rgba(127,29,29,0.18)",
     }}
   >
-    <h3>Producer did not submit</h3>
+    <h3>{player.displayName ?? "Producer"} did not submit</h3>
     <p style={{ color: "#fca5a5", marginTop: 4 }}>
-      This player joined the battle but did not upload a beat before the
-      submission window closed.
+      {player.displayName ?? "This player"} joined the battle but did not upload a beat before the
+submission window closed.
     </p>
   </div>
 ))}

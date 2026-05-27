@@ -19,9 +19,9 @@ export default function FaqPage() {
             "Each battle has one shared sample in the middle of the page. Download it and drop it into FL Studio or your DAW of choice.",
         },
         {
-          question: "Produce for 10 minutes.",
+          question: "Produce for 15 minutes.",
           answer:
-            "You have a 10-minute timer to build your beat. You can upload your track at any time during this window.",
+            "You have a 15-minute timer to build your beat. You can upload your track at any time during this window.",
         },
         {
           question: "Upload your track.",
@@ -73,31 +73,31 @@ export default function FaqPage() {
         },
         {
           question: "Bronze",
-          answer: "0–199 rating.",
+          answer: "0–49 rating.",
         },
         {
           question: "Silver",
-          answer: "200–399 rating.",
+          answer: "50–99 rating.",
         },
         {
           question: "Gold",
-          answer: "400–599 rating.",
+          answer: "100–199 rating.",
         },
         {
           question: "Platinum",
-          answer: "600–799 rating.",
+          answer: "200–299 rating.",
         },
         {
           question: "Diamond",
-          answer: "800–999 rating.",
+          answer: "300–399 rating.",
         },
         {
           question: "Emerald",
-          answer: "1000–1499 rating.",
+          answer: "400–599 rating.",
         },
         {
           question: "Ruby",
-          answer: "1500+ rating.",
+          answer: "600+ rating.",
         },
         {
           question: "Champion",
@@ -220,7 +220,7 @@ export default function FaqPage() {
                 color: "var(--text)",
               }}
             >
-              10:00
+              15:00
             </strong>
             <p
               style={{
@@ -449,7 +449,7 @@ export default function FaqPage() {
               color: "var(--text)",
             }}
           >
-            Start your next 10-minute battle.
+            Start your next 15-minute battle.
           </h2>
 
           <p

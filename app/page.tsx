@@ -13,7 +13,7 @@ export default function HomePage() {
             </div>
 
             <h1>
-              10 Minute
+              15 Minute
               <br />
               Beat Battles
             </h1>
@@ -51,7 +51,7 @@ export default function HomePage() {
 
             <div className="stats-grid">
               <div className="stat-box">
-                <strong>10:00</strong>
+                <strong>15:00</strong>
                 <span>Round timer</span>
               </div>
               <div className="stat-box">
@@ -236,7 +236,7 @@ export default function HomePage() {
             Ready to battle?
           </div>
 
-          <h2>Start your first 10-minute round.</h2>
+          <h2>Start your first 15-minute round.</h2>
 
           <p>
             Log in, hit queue, and see what you can make from a random sample.

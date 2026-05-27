@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
-const INITIAL_TIME = 10 * 60; // 10 minutes in seconds
+const INITIAL_TIME = 15 * 60; // 15 minutes in seconds
 const QUEUE_READY_TIME = 60; // 60 seconds after min players are reached
 
 type Phase = "countdown" | "upload" | "results";
@@ -1223,7 +1223,7 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
       {!matchStarted && (
         <p style={{ marginBottom: 12 }}>
           Waiting for enough players to start the battle. Once the battle
-          starts, you&apos;ll get a sample and a 10-minute timer to make
+          starts, you&apos;ll get a sample and a 15-minute timer to make
           your beat.
         </p>
       )}
@@ -1234,7 +1234,7 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
           <p>
             Open FL Studio on your computer and use the sample below to
             create a beat. You can upload your clip at any time during the
-            10-minute window. Once you upload, you&apos;re locked in for
+            15-minute window. Once you upload, you&apos;re locked in for
             this battle.
           </p>
 
@@ -1281,7 +1281,7 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
             <h3>Upload your track</h3>
             <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
               Accepted: mp3, wav, etc. You can replace your upload during
-              the 10-minute window.
+              the 15-minute window.
             </p>
 
             <input

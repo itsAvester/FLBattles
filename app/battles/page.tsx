@@ -144,7 +144,7 @@ export default function BattlesPage() {
 
             <div className="stats-grid">
               <div className="stat-box">
-                <strong>10:00</strong>
+                <strong>15:00</strong>
                 <span>Round timer</span>
               </div>
               <div className="stat-box">

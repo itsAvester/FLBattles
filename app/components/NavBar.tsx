@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 
 export default function NavBar() {
   const [user, setUser] = useState<User | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Load auth status
@@ -15,6 +16,7 @@ export default function NavBar() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
       setUser(user ?? null);
       setLoading(false);
     };
@@ -31,15 +33,46 @@ export default function NavBar() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Load profile display name for navbar
+  useEffect(() => {
+    const loadDisplayName = async () => {
+      if (!user?.id) {
+        setDisplayName(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .single();
+
+      if (error) {
+        console.error("Error loading display name:", error);
+        setDisplayName(null);
+        return;
+      }
+
+      setDisplayName(data?.display_name ?? null);
+    };
+
+    loadDisplayName();
+  }, [user?.id]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setDisplayName(null);
   };
 
   return (
     <nav className="nav">
       {/* LEFT: BRAND */}
-      <Link href="/" className="logo" style={{ textDecoration: "none", color: "#e2e8f0" }}>
+      <Link
+        href="/"
+        className="logo"
+        style={{ textDecoration: "none", color: "#e2e8f0" }}
+      >
         FL BATTLES
       </Link>
 
@@ -56,7 +89,7 @@ export default function NavBar() {
         ) : user ? (
           <>
             <span style={{ color: "#94a3b8", fontSize: "0.85rem" }}>
-              {user.email}
+              {displayName || user.email}
             </span>
 
             <button

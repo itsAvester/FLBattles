@@ -532,7 +532,7 @@ useEffect(() => {
         setSampleLoading(true);
         setSampleError(null);
 
-        const res = await fetch("/api/random-sample");
+        const res = await fetch(`/api/random-sample?battleId=${battleId}`);
         if (!res.ok) {
           let msg = "Failed to fetch sample";
           try {
@@ -1060,15 +1060,16 @@ const playersWithoutSubmissions = uniqueActivePlayers.filter(
         console.warn("Could not load user when leaving battle:", userError);
       } else {
         // 2) ALWAYS remove this user from the lobby so counts stay correct
-        const { error: deleteErr } = await supabase
-          .from("battle_lobby_players")
-          .delete()
-          .eq("lobby_id", battleId)
-          .eq("user_id", user.id);
-
-        if (deleteErr) {
-          console.error("Failed to remove player from lobby:", deleteErr);
-        }
+        const { error: leaveErr } = await supabase
+  .from("battle_lobby_players")
+  .update({
+    left_at: new Date().toISOString(),
+  })
+  .eq("lobby_id", battleId)
+  .eq("user_id", user.id);
+  if (leaveErr) {
+  console.error("Failed to mark player as left:", leaveErr);
+}
 
         // 3) If ranked and leaving during/after battle, apply rating penalty
         if (shouldPenalize) {

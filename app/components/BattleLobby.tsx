@@ -186,6 +186,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const mode = searchParams.get("mode") ?? "ranked";
   const isRanked = mode !== "custom";
 const playedStartSoundFor = useRef<string | null>(null);
+const votingSectionRef = useRef<HTMLDivElement | null>(null);
 
 const playMatchStartSound = () => {
   try {
@@ -541,7 +542,7 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
       supabase.removeChannel(lobbyChannel);
       supabase.removeChannel(playersChannel);
     };
-  }, [battleId]);
+  }, [battleId, router]);
 
   useEffect(() => {
     if (!battleId) return;
@@ -882,6 +883,19 @@ useEffect(() => {
 
     return () => clearInterval(interval);
   }, [phase, lobby?.status, lobby?.voting_ends_at]);
+
+  useEffect(() => {
+    if (phase !== "results") return;
+
+    const timeout = window.setTimeout(() => {
+      votingSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [phase]);
 
   // ───────────────── RANKED STATS UPDATE ─────────────────
 
@@ -1702,7 +1716,19 @@ const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers
 
       {/* RESULTS PHASE */}
       {matchStarted && phase === "results" && (
-        <>
+        <section
+          ref={votingSectionRef}
+          className="battle-voting-panel"
+          style={{
+            scrollMarginTop: 96,
+            marginTop: 18,
+            padding: "16px",
+            border: "1px solid rgba(34, 197, 94, 0.35)",
+            background:
+              "linear-gradient(180deg, rgba(34,197,94,0.10), rgba(0,0,0,0.18))",
+            boxShadow: "0 0 30px rgba(34,197,94,0.10)",
+          }}
+        >
           <p className="highlight">Results / Voting</p>
 
           <p
@@ -1763,7 +1789,14 @@ const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers
   </div>
 )}
 
-<div style={{ marginTop: 16 }}>
+<div
+  style={{
+    marginTop: 16,
+    padding: "12px",
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "rgba(0,0,0,0.22)",
+  }}
+>
             {loadingSubmissions ? (
               <p>Loading submissions...</p>
             ) : submissions.length === 0 ? (
@@ -1781,24 +1814,22 @@ const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers
                     <div
                       key={sub.id}
                       className="sample-box"
-                      style={{ marginBottom: 12 }}
+                      style={{
+                        marginBottom: 10,
+                        padding: "12px 14px",
+                      }}
                     >
-                      <h3>{label}</h3>
-                      <audio
-                        controls
-                        style={{ width: "100%", marginTop: 4 }}
-                      >
-                        <source src={sub.url} />
-                        Your browser does not support the audio element.
-                      </audio>
                       <div
                         style={{
-                          marginTop: 8,
                           display: "flex",
                           alignItems: "center",
-                          gap: 8,
+                          justifyContent: "space-between",
+                          gap: 12,
+                          marginBottom: 8,
                         }}
                       >
+                        <h3 style={{ margin: 0 }}>{label}</h3>
+
                         {!sub.isSelf && (
                           <button
                             onClick={() => handleVote(sub)}
@@ -1812,17 +1843,27 @@ const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers
                             {isVoted ? "You voted for this" : votingClosed ? "Voting closed" : "Vote"}
                           </button>
                         )}
+
                         {sub.isSelf && (
                           <span
                             style={{
                               fontSize: "0.8rem",
                               color: "#9ca3af",
+                              whiteSpace: "nowrap",
                             }}
                           >
-                            (Your track)
+                            Your track
                           </span>
                         )}
                       </div>
+
+                      <audio
+                        controls
+                        style={{ width: "100%", marginTop: 4, height: 36 }}
+                      >
+                        <source src={sub.url} />
+                        Your browser does not support the audio element.
+                      </audio>
                     </div>
                   );
                 })}
@@ -1901,7 +1942,7 @@ submission window closed.
               Custom battle: stats and rating are not changed by this match.
             </p>
           )}
-        </>
+        </section>
       )}
 
       {leaveError && (

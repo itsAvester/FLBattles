@@ -1399,12 +1399,6 @@ const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers
           </div>
 
           <h2 className="battle-lobby-title">Battle Lobby</h2>
-
-          <p className="battle-lobby-description">
-            {isRanked
-              ? "Compete live for rating, rank tier, and leaderboard position in a synchronized beat battle."
-              : "Create, upload, and vote in a private unranked battle without affecting rating or leaderboard stats."}
-          </p>
         </div>
 
         <div className="battle-lobby-hero-side">
@@ -1413,10 +1407,6 @@ const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers
             <code className="battle-lobby-id-value">{battleId}</code>
           </div>
 
-          <div className="battle-lobby-hero-tags">
-            <span className="battle-lobby-tag">15 minute round</span>
-            <span className="battle-lobby-tag">3 to 7 players</span>
-          </div>
         </div>
       </section>
 
@@ -1453,8 +1443,8 @@ const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers
               </div>
 
               <div className="battle-lobby-stat-card">
-                <span className="battle-lobby-stat-label">Minimum</span>
-                <strong className="battle-lobby-stat-value">{lobby.min_players}</strong>
+                <span className="battle-lobby-stat-label">Round</span>
+                <strong className="battle-lobby-stat-value battle-lobby-stat-value-text">15:00</strong>
               </div>
 
               <div className="battle-lobby-stat-card">

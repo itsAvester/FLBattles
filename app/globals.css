@@ -1911,3 +1911,65 @@ a.btn-secondary:hover {
     text-align: left;
   }
 }
+
+/* =========================================================
+   EXTRA-COMPACT BATTLE LOBBY HEADER
+   Removes the long subtitle area and folds round length into the stats row.
+   ========================================================= */
+
+.battle-lobby-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.42fr);
+  align-items: center;
+  gap: 16px;
+  padding: 12px 28px 12px;
+}
+
+.battle-lobby-hero-topline {
+  margin-bottom: 8px;
+}
+
+.battle-lobby-title {
+  font-size: clamp(1.85rem, 2.55vw, 2.65rem);
+  line-height: 0.95;
+}
+
+.battle-lobby-description {
+  display: none;
+}
+
+.battle-lobby-hero-side {
+  gap: 0;
+}
+
+.battle-lobby-id-card {
+  width: min(100%, 360px);
+  padding: 10px 12px;
+}
+
+.battle-lobby-id-value {
+  margin-top: 5px;
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.battle-lobby-hero-tags {
+  display: none;
+}
+
+.battle-lobby-status-box {
+  padding-top: 15px;
+}
+
+.battle-lobby-stat-grid {
+  margin-top: 16px;
+}
+
+@media (max-width: 980px) {
+  .battle-lobby-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-lobby-id-card {
+    width: 100%;
+  }
+}

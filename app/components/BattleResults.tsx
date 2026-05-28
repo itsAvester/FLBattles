@@ -254,7 +254,6 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
         <>
           <section className="battle-podium-section">
             <div className="battle-results-section-header">
-              <span className="battle-results-eyebrow">Podium</span>
               <h3>Top producers</h3>
             </div>
 

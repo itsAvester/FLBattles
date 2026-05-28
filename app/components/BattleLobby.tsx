@@ -628,7 +628,7 @@ useEffect(() => {
   advanceLobbies();
 
   // Then run every 10 seconds while the user is on this lobby page
-  const interval = setInterval(advanceLobbies, 10000);
+  const interval = setInterval(advanceLobbies, 3000);
 
   return () => clearInterval(interval);
 }, [battleId]);

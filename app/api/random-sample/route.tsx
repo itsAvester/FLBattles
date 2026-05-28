@@ -7,7 +7,33 @@ export const dynamic = "force-dynamic";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const AUDIO_EXTENSIONS = [".mp3", ".wav", ".ogg", ".flac", ".m4a"];
+const BUCKET_NAME = "battle-samples";
+
+const AUDIO_EXTENSIONS = [
+  ".mp3",
+  ".wav",
+  ".ogg",
+  ".flac",
+  ".m4a",
+  ".aif",
+  ".aiff",
+  ".webm",
+];
+
+type SampleFile = {
+  name: string;
+  path: string;
+};
+
+function isAudioFile(path: string) {
+  const lower = path.toLowerCase();
+  return AUDIO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+function isProbablyFolder(file: any) {
+  // Supabase Storage folder entries usually have no id / no metadata.
+  return !file.id || file.metadata === null;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -30,6 +56,7 @@ export async function GET(req: NextRequest) {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // 1) Check whether this lobby already has a saved sample.
+    // This keeps every player in the same battle on the same sample.
     const { data: existingLobby, error: existingLobbyError } = await supabase
       .from("battle_lobbies")
       .select("id, sample_name, sample_url")
@@ -54,47 +81,70 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 2) No sample saved yet, so choose one random sample.
-    const { data: files, error: listError } = await supabase.storage
-      .from("battle-samples")
-      .list("", {
-        limit: 1000,
-        sortBy: { column: "name", order: "asc" },
-      });
+    // 2) Recursively list all audio samples in the bucket.
+    const allAudioFiles: SampleFile[] = [];
 
-    if (listError) {
+    async function listFolder(prefix: string) {
+      const limit = 1000;
+      let offset = 0;
+
+      while (true) {
+        const { data: files, error: listError } = await supabase.storage
+          .from(BUCKET_NAME)
+          .list(prefix, {
+            limit,
+            offset,
+            sortBy: { column: "name", order: "asc" },
+          });
+
+        if (listError) {
+          throw new Error(`Failed to list samples: ${listError.message}`);
+        }
+
+        if (!files || files.length === 0) break;
+
+        for (const file of files) {
+          const fullPath = prefix ? `${prefix}/${file.name}` : file.name;
+
+          if (isAudioFile(fullPath)) {
+            allAudioFiles.push({
+              name: file.name,
+              path: fullPath,
+            });
+          } else if (isProbablyFolder(file)) {
+            await listFolder(fullPath);
+          }
+        }
+
+        if (files.length < limit) break;
+        offset += limit;
+      }
+    }
+
+    await listFolder("");
+
+    if (allAudioFiles.length === 0) {
       return NextResponse.json(
-        { error: `Failed to list samples: ${listError.message}` },
+        { error: `No audio samples found in Supabase bucket ${BUCKET_NAME}` },
         { status: 500 }
       );
     }
 
-    const audioFiles =
-      files?.filter((file) =>
-        AUDIO_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
-      ) ?? [];
-
-    if (audioFiles.length === 0) {
-      return NextResponse.json(
-        { error: "No audio samples found in Supabase bucket battle-samples" },
-        { status: 500 }
-      );
-    }
-
-    const randomIndex = Math.floor(Math.random() * audioFiles.length);
-    const filename = audioFiles[randomIndex].name;
+    // 3) Choose one random sample from every discovered audio file.
+    const randomIndex = Math.floor(Math.random() * allAudioFiles.length);
+    const selectedSample = allAudioFiles[randomIndex];
 
     const { data: publicUrlData } = supabase.storage
-      .from("battle-samples")
-      .getPublicUrl(filename);
+      .from(BUCKET_NAME)
+      .getPublicUrl(selectedSample.path);
 
     const sampleUrl = publicUrlData.publicUrl;
 
-    // 3) Save the sample only if another request has not already saved one.
+    // 4) Save the sample only if another request has not already saved one.
     const { data: updatedLobby, error: updateError } = await supabase
       .from("battle_lobbies")
       .update({
-        sample_name: filename,
+        sample_name: selectedSample.path,
         sample_url: sampleUrl,
       })
       .eq("id", battleId)
@@ -109,7 +159,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 4) If this request saved the sample, return it.
+    // 5) If this request saved the sample, return it.
     if (updatedLobby?.sample_name && updatedLobby?.sample_url) {
       return NextResponse.json({
         filename: updatedLobby.sample_name,
@@ -117,7 +167,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 5) If another user saved the sample at the same time, read the final saved sample.
+    // 6) If another user saved the sample at the same time, return the final saved sample.
     const { data: finalLobby, error: finalError } = await supabase
       .from("battle_lobbies")
       .select("sample_name, sample_url")

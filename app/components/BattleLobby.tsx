@@ -40,7 +40,6 @@ type Lobby = {
   created_at: string;
   ready_at: string | null;
   force_start: boolean;
-  // universal match timer
   battle_started_at: string | null;
   upload_ends_at: string | null;
   voting_started_at: string | null;
@@ -232,6 +231,7 @@ const submittedUsersLoadedRef = useRef(false);
   const [voteError, setVoteError] = useState<string | null>(null);
 
   const [allVotesIn, setAllVotesIn] = useState(false);
+  
   const [votingTimeLeft, setVotingTimeLeft] = useState<number>(VOTING_TIME);
 
   // leaving / penalty
@@ -348,16 +348,21 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
       setLobby(lobbyRow);
 
       if (lobbyRow.status === "in_progress" && lobbyRow.battle_started_at) {
-        setMatchStarted(true);
-        setPhase("countdown");
-      } else if (lobbyRow.status === "voting" || lobbyRow.status === "finished") {
-        setMatchStarted(true);
-        setPhase("results");
-      } else {
-        setMatchStarted(false);
-        setPhase("countdown");
-        setTimeLeft(INITIAL_TIME);
-      }
+  setMatchStarted(true);
+  setPhase("countdown");
+} else if (lobbyRow.status === "voting") {
+  setMatchStarted(true);
+  setPhase("results");
+} else if (lobbyRow.status === "finished") {
+  setMatchStarted(true);
+  setPhase("results");
+  setAllVotesIn(true);
+  router.push(`/battles/${battleId}/results`);
+} else {
+  setMatchStarted(false);
+  setPhase("countdown");
+  setTimeLeft(INITIAL_TIME);
+}
 
       const { data: playersData, error: playersErr } = await supabase
   .from("battle_lobby_players")
@@ -376,7 +381,7 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
     };
 
     fetchLobby();
-  }, [battleId]);
+  }, [battleId, router]);
 
   // Realtime subscriptions for lobby + players
   useEffect(() => {
@@ -395,15 +400,21 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
           setLobby(updated);
 
           if (updated.status === "in_progress" && updated.battle_started_at) {
-            setMatchStarted(true);
-          } else if (updated.status === "searching") {
-            setMatchStarted(false);
-            setPhase("countdown");
-            setTimeLeft(INITIAL_TIME);
-            setDebugStartTime(null);
-          } else if (updated.status === "voting" || updated.status === "finished") {
+  setMatchStarted(true);
+  setPhase("countdown");
+} else if (updated.status === "searching") {
+  setMatchStarted(false);
+  setPhase("countdown");
+  setTimeLeft(INITIAL_TIME);
+  setDebugStartTime(null);
+} else if (updated.status === "voting") {
   setMatchStarted(true);
   setPhase("results");
+} else if (updated.status === "finished") {
+  setMatchStarted(true);
+  setPhase("results");
+  setAllVotesIn(true);
+  router.push(`/battles/${battleId}/results`);
 }
         }
       )

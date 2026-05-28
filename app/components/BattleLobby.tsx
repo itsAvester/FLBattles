@@ -101,15 +101,75 @@ function getRankFromRating(rating: number | null | undefined): string {
   if (r >= 50) return "Silver";
   return "Bronze";
 }
+
+function getRankTheme(rank: string) {
+  switch (rank) {
+    case "Ruby":
+      return {
+        text: "#fda4af",
+        border: "rgba(244, 63, 94, 0.42)",
+        background: "rgba(244, 63, 94, 0.14)",
+        glow: "0 0 18px rgba(244, 63, 94, 0.18)",
+      };
+    case "Emerald":
+      return {
+        text: "#6ee7b7",
+        border: "rgba(16, 185, 129, 0.42)",
+        background: "rgba(16, 185, 129, 0.14)",
+        glow: "0 0 18px rgba(16, 185, 129, 0.18)",
+      };
+    case "Diamond":
+      return {
+        text: "#c4b5fd",
+        border: "rgba(139, 92, 246, 0.42)",
+        background: "rgba(139, 92, 246, 0.14)",
+        glow: "0 0 18px rgba(139, 92, 246, 0.18)",
+      };
+    case "Platinum":
+      return {
+        text: "#7dd3fc",
+        border: "rgba(14, 165, 233, 0.42)",
+        background: "rgba(14, 165, 233, 0.14)",
+        glow: "0 0 18px rgba(14, 165, 233, 0.18)",
+      };
+    case "Gold":
+      return {
+        text: "#f6c65b",
+        border: "rgba(246, 198, 91, 0.42)",
+        background: "rgba(246, 198, 91, 0.14)",
+        glow: "0 0 18px rgba(246, 198, 91, 0.16)",
+      };
+    case "Silver":
+      return {
+        text: "#d1d5db",
+        border: "rgba(209, 213, 219, 0.35)",
+        background: "rgba(209, 213, 219, 0.10)",
+        glow: "none",
+      };
+    case "Bronze":
+      return {
+        text: "#d6a46a",
+        border: "rgba(214, 164, 106, 0.35)",
+        background: "rgba(214, 164, 106, 0.12)",
+        glow: "none",
+      };
+    default:
+      return {
+        text: "#a1a1aa",
+        border: "rgba(161, 161, 170, 0.26)",
+        background: "rgba(161, 161, 170, 0.10)",
+        glow: "none",
+      };
+  }
+}
+
 function formatQueueEta(seconds: number | null): string {
   if (seconds == null) return "--:--";
-
-  const safeSeconds = Math.max(0, seconds);
-  const mins = Math.floor(safeSeconds / 60);
-  const secs = String(safeSeconds % 60).padStart(2, "0");
-
+  const mins = Math.floor(seconds / 60);
+  const secs = String(seconds % 60).padStart(2, "0");
   return `${mins}:${secs}`;
 }
+
 export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1312,141 +1372,142 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
   (p) => !submittedUserIdsFromLoadedSubmissions.has(p.user_id)
 );
 
-const activePlayerCount = uniqueActivePlayers.length;
-const minPlayersNeeded = lobby
-  ? Math.max(lobby.min_players - activePlayerCount, 0)
-  : 0;
-const minReached = Boolean(lobby && activePlayerCount >= lobby.min_players);
-const queueProgressPercent = lobby
-  ? Math.min(100, Math.round((activePlayerCount / lobby.min_players) * 100))
-  : 0;
-const lobbyFillPercent = lobby
-  ? Math.min(100, Math.round((activePlayerCount / lobby.max_players) * 100))
-  : 0;
+const playerCount = uniqueActivePlayers.length;
+const minPlayers = lobby?.min_players ?? 0;
+const maxPlayers = lobby?.max_players ?? 0;
+const playersNeeded = Math.max(minPlayers - playerCount, 0);
+const queueReady = !!lobby && lobby.status === "searching" && playerCount >= minPlayers;
+const queueFillPercent = minPlayers > 0 ? Math.min((playerCount / minPlayers) * 100, 100) : 0;
+const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers) * 100, 100) : 0;
   // ───────────────── RENDER ─────────────────
 
   return (
-    <div className="card">
-      <h2>Battle Lobby: {battleId}</h2>
-      <p className="page-description" style={{ marginBottom: 12 }}>
-        {isRanked ? "Ranked Battle" : "Custom Battle (Unranked)"}
-      </p>
-      <p style={{ color: "#cbd5f5", marginBottom: 16 }}>
-        {isRanked
-          ? "This battle affects your rating, rank tier, and leaderboard position."
-          : "This is a custom, unranked lobby. Results here will not change your rating or rank."}
-      </p>
-
-      {/* LOBBY INFO */}
-      <div className="lobby-status-panel">
-        <div className="lobby-status-topline">
-          <div>
-            <p className="panel-label" style={{ margin: 0 }}>
-              Lobby status
-            </p>
-            <h3 className="lobby-status-heading">
-              {lobbyLoading
-                ? "Loading lobby..."
-                : lobbyError
-                  ? "Lobby unavailable"
-                  : lobby?.status === "searching"
-                    ? minReached
-                      ? "Queue ready"
-                      : "Waiting for players"
-                    : lobby?.status === "in_progress"
-                      ? "Battle in progress"
-                      : lobby?.status === "voting"
-                        ? "Voting open"
-                        : lobby?.status === "finished"
-                          ? "Battle finished"
-                          : "Lobby status"}
-            </h3>
-          </div>
-
-          {!lobbyLoading && !lobbyError && lobby && (
-            <div
-              className={`lobby-live-badge ${
-                minReached || matchStarted ? "is-ready" : "is-waiting"
+    <div className="card battle-lobby-card">
+      <section className="battle-lobby-hero">
+        <div className="battle-lobby-hero-copy">
+          <div className="battle-lobby-hero-topline">
+            <span className="battle-lobby-eyebrow">Live battle room</span>
+            <span
+              className={`battle-lobby-mode-pill ${
+                isRanked
+                  ? "battle-lobby-mode-pill-ranked"
+                  : "battle-lobby-mode-pill-custom"
               }`}
             >
-              <span />
-              {matchStarted
-                ? "Live"
-                : minReached
-                  ? "Ready"
-                  : `${minPlayersNeeded} needed`}
-            </div>
-          )}
+              {isRanked ? "Ranked Battle" : "Custom Battle"}
+            </span>
+          </div>
+
+          <h2 className="battle-lobby-title">Battle Lobby</h2>
+
+          <p className="battle-lobby-description">
+            {isRanked
+              ? "Compete live for rating, rank tier, and leaderboard position in a synchronized beat battle."
+              : "Create, upload, and vote in a private unranked battle without affecting rating or leaderboard stats."}
+          </p>
         </div>
 
-        {lobbyLoading && <p className="lobby-muted-copy">Loading lobby details...</p>}
+        <div className="battle-lobby-hero-side">
+          <div className="battle-lobby-id-card">
+            <span className="battle-lobby-id-label">Lobby ID</span>
+            <code className="battle-lobby-id-value">{battleId}</code>
+          </div>
 
-        {lobbyError && <p className="lobby-error-copy">{lobbyError}</p>}
+          <div className="battle-lobby-hero-tags">
+            <span className="battle-lobby-tag">15 minute round</span>
+            <span className="battle-lobby-tag">3 to 7 players</span>
+          </div>
+        </div>
+      </section>
 
+      {/* LOBBY INFO */}
+      <div className="sample-box battle-lobby-status-box" style={{ marginBottom: 16 }}>
+        {lobbyLoading && <p>Loading lobby...</p>}
+        {lobbyError && <p style={{ color: "#f97373" }}>{lobbyError}</p>}
         {!lobbyLoading && !lobbyError && lobby && (
           <>
-            <div className="lobby-metrics-grid">
-              <div className="lobby-metric-card">
-                <span>Players</span>
-                <strong>
-                  {activePlayerCount}
-                  <small>/{lobby.max_players}</small>
+            <div className="battle-lobby-status-heading-row">
+              <div>
+                <p className="battle-lobby-section-label">Lobby status</p>
+                <h3 className="battle-lobby-status-title">
+                  {queueReady ? "Queue ready" : matchStarted ? "Battle in progress" : "Waiting for players"}
+                </h3>
+              </div>
+
+              {!matchStarted && (
+                <div className="battle-lobby-status-chip">
+                  {queueReady
+                    ? `Auto-start in ${formatQueueEta(autoStartEta)}`
+                    : `${playersNeeded} needed`}
+                </div>
+              )}
+            </div>
+
+            <div className="battle-lobby-stat-grid">
+              <div className="battle-lobby-stat-card">
+                <span className="battle-lobby-stat-label">Players</span>
+                <strong className="battle-lobby-stat-value">
+                  {playerCount}
+                  <span>/{lobby.max_players}</span>
                 </strong>
               </div>
 
-              <div className="lobby-metric-card">
-                <span>Minimum</span>
-                <strong>{lobby.min_players}</strong>
+              <div className="battle-lobby-stat-card">
+                <span className="battle-lobby-stat-label">Minimum</span>
+                <strong className="battle-lobby-stat-value">{lobby.min_players}</strong>
               </div>
 
-              <div className="lobby-metric-card">
-                <span>Mode</span>
-                <strong>{isRanked ? "Ranked" : "Custom"}</strong>
+              <div className="battle-lobby-stat-card">
+                <span className="battle-lobby-stat-label">Mode</span>
+                <strong className="battle-lobby-stat-value battle-lobby-stat-value-text">
+                  {isRanked ? "Ranked" : "Custom"}
+                </strong>
               </div>
 
-              <div className="lobby-metric-card">
-                <span>Status</span>
-                <strong>
-                  {matchStarted
-                    ? "Started"
-                    : minReached
-                      ? "Ready"
-                      : "Queued"}
+              <div className="battle-lobby-stat-card">
+                <span className="battle-lobby-stat-label">Status</span>
+                <strong className="battle-lobby-stat-value battle-lobby-stat-value-text">
+                  {matchStarted ? "Live" : queueReady ? "Ready" : "Queued"}
                 </strong>
               </div>
             </div>
 
-            <div className="lobby-player-section">
-              <div className="lobby-section-heading-row">
-                <p className="lobby-section-label">Players in lobby</p>
-                <span className="lobby-section-count">
-                  {activePlayerCount} active
-                </span>
+            <div className="battle-lobby-player-list-card">
+              <div className="battle-lobby-player-list-head">
+                <p className="battle-lobby-section-label">Players in lobby</p>
+                <span className="battle-lobby-player-count-note">{playerCount} active</span>
               </div>
 
-              <div className="lobby-player-pill-row">
+              <div className="battle-lobby-player-chip-row">
                 {uniqueActivePlayers.map((player, index) => {
                   const profile = playerProfilesById[player.user_id];
                   const displayName = profile?.displayName ?? `Player ${index + 1}`;
                   const rating = profile?.rating ?? 0;
                   const rank = getRankFromRating(rating);
+                  const rankTheme = getRankTheme(rank);
                   const hasSubmitted = submittedUserIds.has(player.user_id);
 
                   return (
                     <span
                       key={player.user_id}
-                      className={`lobby-player-pill ${
-                        hasSubmitted ? "has-submitted" : ""
+                      className={`battle-lobby-player-chip ${
+                        hasSubmitted ? "battle-lobby-player-chip-submitted" : ""
                       }`}
-                      title={
-                        hasSubmitted ? "Beat submitted" : "Waiting for submission"
-                      }
+                      title={hasSubmitted ? "Beat submitted" : "Waiting for submission"}
                     >
-                      <span className="lobby-player-rank">{rank}</span>
-                      <span className="lobby-player-name">{displayName}</span>
-                      {hasSubmitted && (
-                        <span className="lobby-player-check">✓</span>
-                      )}
+                      <span
+                        className="battle-lobby-rank-pill"
+                        style={{
+                          color: rankTheme.text,
+                          borderColor: rankTheme.border,
+                          background: rankTheme.background,
+                          boxShadow: rankTheme.glow,
+                        }}
+                      >
+                        {rank}
+                      </span>
+                      <span className="battle-lobby-player-name">{displayName}</span>
+                      {hasSubmitted && <span className="battle-lobby-submitted-check">✓</span>}
                     </span>
                   );
                 })}
@@ -1454,83 +1515,65 @@ const lobbyFillPercent = lobby
             </div>
 
             {lobby.status === "searching" && !matchStarted && (
-              <div
-                className={`queue-start-card ${
-                  minReached ? "queue-ready" : "queue-waiting"
-                }`}
-              >
-                <div className="queue-start-header">
+              <div className="battle-lobby-matchmaking-card">
+                <div className="battle-lobby-matchmaking-head">
                   <div>
-                    <div className="queue-start-kicker">
-                      <span className="queue-pulse-dot" />
-                      {minReached ? "Minimum reached" : "Matchmaking"}
-                    </div>
-
-                    <h4>
-                      {minReached
-                        ? "Battle starts automatically"
-                        : `Need ${minPlayersNeeded} more player${
-                            minPlayersNeeded === 1 ? "" : "s"
-                          }`}
+                    <p className="battle-lobby-section-label">Matchmaking</p>
+                    <h4 className="battle-lobby-matchmaking-title">
+                      {queueReady
+                        ? `Starting in ${formatQueueEta(autoStartEta)}`
+                        : `Need ${playersNeeded} more player${playersNeeded === 1 ? "" : "s"}`}
                     </h4>
                   </div>
 
-                  <div className="queue-start-timer">
-                    <span>{minReached ? "Auto-start" : "Queue"}</span>
-                    <strong>
-                      {minReached && autoStartEta != null
-                        ? formatQueueEta(autoStartEta)
-                        : `${activePlayerCount}/${lobby.min_players}`}
+                  <div className="battle-lobby-mini-queue-box">
+                    <span className="battle-lobby-mini-queue-label">Queue</span>
+                    <strong className="battle-lobby-mini-queue-value">
+                      {playerCount}/{lobby.min_players}
                     </strong>
                   </div>
                 </div>
 
-                <div className="queue-progress-shell">
-                  <div className="queue-progress-meta">
+                <div className="battle-lobby-progress-block">
+                  <div className="battle-lobby-progress-topline">
                     <span>Minimum players</span>
-                    <span>{queueProgressPercent}%</span>
+                    <span>{Math.round(queueFillPercent)}%</span>
                   </div>
-                  <div className="queue-progress-track-pro">
+                  <div className="battle-lobby-progress-track">
                     <div
-                      className="queue-progress-fill-pro"
-                      style={{ width: `${queueProgressPercent}%` }}
+                      className="battle-lobby-progress-fill battle-lobby-progress-fill-primary"
+                      style={{ width: `${queueFillPercent}%` }}
                     />
                   </div>
                 </div>
 
-                <div className="queue-progress-shell compact">
-                  <div className="queue-progress-meta">
+                <div className="battle-lobby-progress-block">
+                  <div className="battle-lobby-progress-topline">
                     <span>Lobby capacity</span>
                     <span>
-                      {activePlayerCount}/{lobby.max_players}
+                      {playerCount}/{lobby.max_players}
                     </span>
                   </div>
-                  <div className="queue-capacity-track">
+                  <div className="battle-lobby-progress-track battle-lobby-progress-track-secondary">
                     <div
-                      className="queue-capacity-fill"
-                      style={{ width: `${lobbyFillPercent}%` }}
+                      className="battle-lobby-progress-fill battle-lobby-progress-fill-secondary"
+                      style={{ width: `${lobbyCapacityPercent}%` }}
                     />
                   </div>
                 </div>
 
-                <p className="queue-start-copy">
-                  {minReached
-                    ? `The lobby is locked in with enough players. It will start in ${formatQueueEta(
-                        autoStartEta
-                      )}, or immediately if the lobby fills to ${
-                        lobby.max_players
-                      } players.`
-                    : `Battle starts once at least ${lobby.min_players} players have joined. Invite more producers or wait for matchmaking to fill the lobby.`}
+                <p className="battle-lobby-matchmaking-footnote">
+                  {queueReady
+                    ? `Minimum players reached. The battle will start automatically in ${formatQueueEta(autoStartEta)} or immediately if the lobby fills to ${lobby.max_players}.`
+                    : `The queue will begin once at least ${lobby.min_players} players have joined. The lobby can hold up to ${lobby.max_players} players.`}
                 </p>
               </div>
             )}
 
             {matchStarted && (
-              <div className="battle-started-card">
-                <span className="queue-pulse-dot" />
-                Battle has started. Download the sample and submit before the
-                timer ends.
-              </div>
+              <p style={{ fontSize: "0.9rem", color: "#22c55e" }}>
+                Battle has started!
+              </p>
             )}
           </>
         )}

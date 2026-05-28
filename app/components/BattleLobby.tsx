@@ -888,7 +888,8 @@ useEffect(() => {
       const { data: lobbyPlayers, error: playersError } = await supabase
   .from("battle_lobby_players")
   .select("user_id")
-  .eq("lobby_id", battleId);
+  .eq("lobby_id", battleId)
+  .is("left_at", null);
 
 if (playersError) {
   console.error("Error loading lobby players:", playersError);
@@ -1398,8 +1399,9 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
                 )}
                 {new Set(players.map((p) => p.user_id)).size>= lobby.min_players && (
   <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
-    Minimum players reached. Battle starts 60 seconds after the newest player joins{" "}
-{autoStartEta != null && `(~${autoStartEta}s until auto-start)`}
+    Minimum players reached. Battle starts shortly
+{autoStartEta != null && ` (~${autoStartEta}s until auto-start)`}
+.
 
     .
   </p>

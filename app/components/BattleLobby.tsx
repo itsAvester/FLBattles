@@ -6,6 +6,7 @@ import { supabase } from "../../lib/supabaseClient";
 
 const INITIAL_TIME = 15 * 60; // 15 minutes in seconds
 const QUEUE_READY_TIME = 60; // 60 seconds after min players are reached
+const VOTING_TIME = 2 * 60 + 30; // 2 minutes 30 seconds
 
 type Phase = "countdown" | "upload" | "results";
 
@@ -32,7 +33,7 @@ type SubmissionView = {
 
 type Lobby = {
   id: string;
-  status: string; // 'searching' | 'in_progress' | 'finished'
+  status: string; // 'searching' | 'in_progress' | 'voting' | 'finished'
   mode: string;
   min_players: number;
   max_players: number;
@@ -41,6 +42,10 @@ type Lobby = {
   force_start: boolean;
   // universal match timer
   battle_started_at: string | null;
+  upload_ends_at: string | null;
+  voting_started_at: string | null;
+  voting_ends_at: string | null;
+  finished_at: string | null;
 };
 
 type LobbyPlayer = {
@@ -227,6 +232,7 @@ const submittedUsersLoadedRef = useRef(false);
   const [voteError, setVoteError] = useState<string | null>(null);
 
   const [allVotesIn, setAllVotesIn] = useState(false);
+  const [votingTimeLeft, setVotingTimeLeft] = useState<number>(VOTING_TIME);
 
   // leaving / penalty
   const [leaving, setLeaving] = useState(false);
@@ -262,6 +268,7 @@ const submittedUsersLoadedRef = useRef(false);
     setVotedForUserId(null);
     setVoteError(null);
     setAllVotesIn(false);
+    setVotingTimeLeft(VOTING_TIME);
     setLeaving(false);
     setLeaveError(null);
   }, [battleId]);
@@ -342,6 +349,10 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
 
       if (lobbyRow.status === "in_progress" && lobbyRow.battle_started_at) {
         setMatchStarted(true);
+        setPhase("countdown");
+      } else if (lobbyRow.status === "voting" || lobbyRow.status === "finished") {
+        setMatchStarted(true);
+        setPhase("results");
       } else {
         setMatchStarted(false);
         setPhase("countdown");
@@ -751,6 +762,26 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, [lobby?.status, lobby?.battle_started_at, debugStartTime, phase]);
 
+  // Visible voting timer. The database is still the authority via voting_ends_at.
+  useEffect(() => {
+    if (phase !== "results" || !lobby?.voting_ends_at || lobby.status === "finished") {
+      setVotingTimeLeft(lobby?.status === "finished" ? 0 : VOTING_TIME);
+      return;
+    }
+
+    const endMs = new Date(lobby.voting_ends_at).getTime();
+
+    const tick = () => {
+      const remaining = Math.max(Math.ceil((endMs - Date.now()) / 1000), 0);
+      setVotingTimeLeft(remaining);
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+
+    return () => clearInterval(interval);
+  }, [phase, lobby?.status, lobby?.voting_ends_at]);
+
   // ───────────────── RANKED STATS UPDATE ─────────────────
 
  /* useEffect(() => {
@@ -967,6 +998,9 @@ if (submissions.length === 1 || count >= requiredVotes) {
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = String(timeLeft % 60).padStart(2, "0");
+  const votingMinutes = Math.floor(votingTimeLeft / 60);
+  const votingSeconds = String(votingTimeLeft % 60).padStart(2, "0");
+  const votingClosed = votingTimeLeft <= 0 || lobby?.status === "finished";
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
@@ -1070,6 +1104,11 @@ if (submissions.length === 1 || count >= requiredVotes) {
 
   const handleVote = async (submission: SubmissionView) => {
     setVoteError(null);
+
+    if (votingClosed) {
+      setVoteError("Voting is closed for this battle.");
+      return;
+    }
 
     if (votedForUserId) {
       setVoteError("You already voted in this battle.");
@@ -1501,9 +1540,27 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
       {matchStarted && phase === "results" && (
         <>
           <p className="highlight">Results / Voting</p>
+
+          <p
+            style={{
+              fontSize: "1.1rem",
+              fontWeight: 800,
+              color: votingClosed
+                ? "#f97373"
+                : votingTimeLeft <= 30
+                ? "#facc15"
+                : "#22c55e",
+              marginBottom: 8,
+            }}
+          >
+            {votingClosed
+              ? "Voting closed"
+              : `Voting time left: ${votingMinutes}:${votingSeconds}`}
+          </p>
+
           <p>
   Listen to all submissions for this battle and cast your vote.
-  You can only vote once per battle.
+  You can only vote once per battle. Voting closes after 2 minutes and 30 seconds.
 </p>
 
 {missingSubmissionCount > 0 && (
@@ -1583,11 +1640,12 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
                             onClick={() => handleVote(sub)}
                             className="btn-secondary"
                             disabled={
+                              votingClosed ||
                               voteSubmitting ||
                               (!!votedForUserId && !isVoted)
                             }
                           >
-                            {isVoted ? "You voted for this" : "Vote"}
+                            {isVoted ? "You voted for this" : votingClosed ? "Voting closed" : "Vote"}
                           </button>
                         )}
                         {sub.isSelf && (

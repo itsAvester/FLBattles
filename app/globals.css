@@ -2381,3 +2381,386 @@ a.btn-secondary:hover {
     flex-direction: column;
   }
 }
+/* =========================================================
+   MOBILE POLISH PATCH
+   Final overrides for iPhone/mobile layout
+   ========================================================= */
+
+@media (max-width: 760px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    font-size: 16px;
+  }
+
+  .page,
+  .home-shell,
+  .battles-shell,
+  .card {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .page-inner {
+    width: 100%;
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  /* ---------- Mobile nav ---------- */
+
+  .nav {
+    position: relative;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 22px 24px 24px;
+  }
+
+  .logo {
+    font-size: 1.05rem;
+  }
+
+  .nav-links {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, max-content);
+    justify-content: start;
+    column-gap: 18px;
+    row-gap: 14px;
+  }
+
+  .nav-links a {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+  }
+
+  .nav-links a:hover {
+    border: 0;
+    background: transparent;
+  }
+
+  .nav-links button,
+  .nav-links .btn-secondary,
+  .nav-links .btn-primary {
+    min-height: 42px;
+    padding: 0 18px;
+  }
+
+  /* If username text is inside nav-links, keep it from stretching layout */
+  .nav-links span,
+  .nav-links p {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ---------- Beta banner ---------- */
+
+  .beta-banner {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 12px;
+    padding: 14px 24px;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .beta-pill {
+    margin-top: 2px;
+  }
+
+  /* ---------- General mobile headings ---------- */
+
+  .hero-copy h1,
+  .battles-copy h1,
+  .battle-results-hero h2,
+  .section-heading h2,
+  .split-section h2,
+  .final-cta h2,
+  .profile-title,
+  .faq-title,
+  h1 {
+    max-width: 100%;
+    font-size: clamp(3rem, 15vw, 4.8rem) !important;
+    line-height: 0.9 !important;
+    letter-spacing: -0.07em;
+    overflow-wrap: normal;
+  }
+
+  h2 {
+    font-size: clamp(2rem, 10vw, 3.2rem);
+    line-height: 0.95;
+  }
+
+  h3 {
+    font-size: clamp(1.25rem, 6vw, 1.8rem);
+  }
+
+  p {
+    max-width: 100%;
+  }
+
+  /* ---------- Home / Battles hero ---------- */
+
+  .retro-hero,
+  .battles-hero {
+    min-height: auto;
+    padding: 42px 0 46px;
+  }
+
+  .hero-grid,
+  .battles-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .hero-description,
+  .battles-copy .hero-description,
+  .page-description {
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .hero-actions,
+  .battle-mode-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .hero-actions .btn-primary,
+  .hero-actions .btn-secondary,
+  .battle-mode-actions .btn-primary,
+  .battle-mode-actions .btn-secondary {
+    width: 100%;
+  }
+
+  /* ---------- FAQ cards ---------- */
+
+  .faq-grid,
+  .faq-card-grid,
+  .feature-grid,
+  .battle-option-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .faq-card,
+  .feature-card,
+  .battle-option-card {
+    min-width: 0;
+    min-height: auto;
+    padding: 22px;
+  }
+
+  .faq-card h3,
+  .feature-card h3,
+  .battle-option-card h3 {
+    font-size: 1.7rem;
+    line-height: 1;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .faq-card p,
+  .feature-card p,
+  .battle-option-card p {
+    font-size: 0.98rem;
+    line-height: 1.55;
+  }
+
+  /* ---------- Profile page ---------- */
+
+  .profile-shell,
+  .profile-card,
+  .profile-panel,
+  .profile-grid,
+  .profile-content,
+  .profile-summary-card {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .profile-grid,
+  .profile-stats-grid,
+  .profile-links-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .profile-card,
+  .profile-panel,
+  .profile-summary-card {
+    padding: 20px;
+  }
+
+  .profile-title,
+  .profile-hero h1,
+  .profile-hero h2 {
+    font-size: clamp(3rem, 16vw, 4.6rem) !important;
+    line-height: 0.9 !important;
+  }
+
+  .profile-card h3,
+  .profile-panel h3 {
+    font-size: 1.6rem;
+    line-height: 1.05;
+  }
+
+  /* ---------- Leaderboard ---------- */
+
+  .leaderboard-shell,
+  .leaderboard-card,
+  .leaderboard-table-wrap {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    min-width: 520px;
+  }
+
+  th,
+  td {
+    white-space: nowrap;
+    padding: 14px 16px;
+  }
+
+  .leaderboard-search,
+  .leaderboard-search-row,
+  .search-row {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* ---------- Battle lobby ---------- */
+
+  .battle-lobby-hero,
+  .battle-lobby-status-box {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .battle-lobby-hero {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .battle-lobby-title {
+    font-size: clamp(2.2rem, 12vw, 3.4rem) !important;
+  }
+
+  .battle-lobby-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .battle-lobby-stat-card {
+    min-width: 0;
+  }
+
+  .battle-lobby-player-chip-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .battle-lobby-player-chip {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .battle-production-panel {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+
+  .battle-production-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-production-topbar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .battle-production-timer {
+    width: 100%;
+    text-align: left;
+  }
+
+  /* ---------- Results page ---------- */
+
+  .battle-results-hero {
+    grid-template-columns: 1fr;
+    padding: 24px 18px;
+  }
+
+  .battle-results-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-podium-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .battle-results-track-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .battle-result-track-topline {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .battle-result-audio-player,
+  .battle-audio-player {
+    width: 100%;
+  }
+}
+
+@media (max-width: 430px) {
+  .nav-links {
+    grid-template-columns: repeat(2, max-content);
+    column-gap: 22px;
+  }
+
+  .battle-lobby-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-copy h1,
+  .battles-copy h1,
+  .battle-results-hero h2,
+  .profile-title,
+  .faq-title,
+  h1 {
+    font-size: clamp(2.8rem, 18vw, 4.25rem) !important;
+  }
+
+  .beta-banner {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+}

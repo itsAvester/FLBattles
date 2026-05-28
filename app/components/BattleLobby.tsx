@@ -85,6 +85,18 @@ function getQueueAutoStartEta(lobby: Lobby | null, playerCount: number): number 
 
   return Math.max(0, eta);
 }
+function getRankFromRating(rating: number | null | undefined): string {
+  const r = rating ?? 0;
+
+  if (r <= 0) return "Unranked";
+  if (r >= 600) return "Ruby";
+  if (r >= 400) return "Emerald";
+  if (r >= 300) return "Diamond";
+  if (r >= 200) return "Platinum";
+  if (r >= 100) return "Gold";
+  if (r >= 50) return "Silver";
+  return "Bronze";
+}
 export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -126,11 +138,47 @@ const playMatchStartSound = () => {
     console.warn("Could not play match start sound:", err);
   }
 };
+
+const playSubmitDing = () => {
+  try {
+    const AudioContextClass =
+      window.AudioContext || (window as any).webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    const audioCtx = new AudioContextClass();
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(
+      1320,
+      audioCtx.currentTime + 0.12
+    );
+
+    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.16, audioCtx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.28);
+
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.28);
+  } catch (err) {
+    console.warn("Could not play submit ding:", err);
+  }
+};
   // lobby state
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
   const [lobbyLoading, setLobbyLoading] = useState(true);
-  const [playerNamesById, setPlayerNamesById] = useState<Record<string, string>>({});
+  const [playerProfilesById, setPlayerProfilesById] = useState<
+  Record<string, { displayName: string; rating: number }>
+>({});
+const [submittedUserIds, setSubmittedUserIds] = useState<Set<string>>(new Set());
+const submittedUsersLoadedRef = useRef(false);
   const [lobbyError, setLobbyError] = useState<string | null>(null);
   const [matchStarted, setMatchStarted] = useState(false);
   const [autoStartEta, setAutoStartEta] = useState<number | null>(null);
@@ -207,6 +255,8 @@ const playMatchStartSound = () => {
     setUpdatingStats(false);
     setStatsUpdated(false);
     setSubmissions([]);
+    setSubmittedUserIds(new Set());
+    submittedUsersLoadedRef.current = false;
     setLoadingSubmissions(false);
     setVoteSubmitting(false);
     setVotedForUserId(null);
@@ -221,27 +271,30 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
   const userIds = Array.from(new Set(playerRows.map((p) => p.user_id)));
 
   if (userIds.length === 0) {
-    setPlayerNamesById({});
+    setPlayerProfilesById({});
     return;
   }
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, display_name")
+    .select("id, display_name, rating")
     .in("id", userIds);
 
   if (error) {
-    console.error("Failed to load player names:", error);
+    console.error("Failed to load player profiles:", error);
     return;
   }
 
-  const nameMap: Record<string, string> = {};
+  const profileMap: Record<string, { displayName: string; rating: number }> = {};
 
   for (const profile of data ?? []) {
-    nameMap[profile.id] = profile.display_name || "Unnamed Producer";
+    profileMap[profile.id] = {
+      displayName: profile.display_name || "Unnamed Producer",
+      rating: profile.rating ?? 0,
+    };
   }
 
-  setPlayerNamesById(nameMap);
+  setPlayerProfilesById(profileMap);
 };
   useEffect(() => {
     const fetchLobby = async () => {
@@ -375,6 +428,86 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
     return () => {
       supabase.removeChannel(lobbyChannel);
       supabase.removeChannel(playersChannel);
+    };
+  }, [battleId]);
+
+  useEffect(() => {
+    if (!battleId) return;
+
+    const loadSubmittedUsers = async () => {
+      const { data, error } = await supabase
+        .from("battle_submissions")
+        .select("user_id")
+        .eq("battle_id", battleId);
+
+      if (error) {
+        console.error("Failed to load submitted users:", error);
+        return;
+      }
+
+      const ids = new Set((data ?? []).map((row: any) => row.user_id));
+      setSubmittedUserIds(ids);
+      submittedUsersLoadedRef.current = true;
+    };
+
+    loadSubmittedUsers();
+
+    const submissionsChannel = supabase
+      .channel(`battle_submissions_live:${battleId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "battle_submissions",
+          filter: `battle_id=eq.${battleId}`,
+        },
+        (payload) => {
+          const submittedUserId = (payload.new as { user_id?: string }).user_id;
+          if (!submittedUserId) return;
+
+          setSubmittedUserIds((prev) => {
+            const alreadySubmitted = prev.has(submittedUserId);
+            const next = new Set(prev);
+            next.add(submittedUserId);
+
+            if (!alreadySubmitted && submittedUsersLoadedRef.current) {
+              playSubmitDing();
+            }
+
+            return next;
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "battle_submissions",
+          filter: `battle_id=eq.${battleId}`,
+        },
+        (payload) => {
+          const submittedUserId = (payload.new as { user_id?: string }).user_id;
+          if (!submittedUserId) return;
+
+          setSubmittedUserIds((prev) => {
+            const alreadySubmitted = prev.has(submittedUserId);
+            const next = new Set(prev);
+            next.add(submittedUserId);
+
+            if (!alreadySubmitted && submittedUsersLoadedRef.current) {
+              playSubmitDing();
+            }
+
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(submissionsChannel);
     };
   }, [battleId]);
 
@@ -859,16 +992,6 @@ if (submissions.length === 1 || count >= requiredVotes) {
 
     const uploadWindowOpen = matchStarted && phase !== "results" && timeLeft > 0;
 
-    const submittedUserIds = new Set(submissions.map((s) => s.user_id));
-
-const uniqueActivePlayers = Array.from(
-  new Map(players.map((p) => [p.user_id, p])).values()
-);
-
-const playersWithoutSubmissions = uniqueActivePlayers.filter(
-  (p) => !submittedUserIds.has(p.user_id)
-);
-
     if (!uploadWindowOpen) {
       setUploadError("Upload window has closed for this battle.");
       return;
@@ -1117,14 +1240,16 @@ const playersWithoutSubmissions = uniqueActivePlayers.filter(
       else router.push("/battles");
     }
   };
-const submittedUserIds = new Set(submissions.map((s) => s.user_id));
+const submittedUserIdsFromLoadedSubmissions = new Set(
+  submissions.map((s) => s.user_id)
+);
 
 const uniqueActivePlayers: LobbyPlayer[] = Array.from(
   new Map(players.map((p) => [p.user_id, p])).values()
 );
 
 const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
-  (p) => !submittedUserIds.has(p.user_id)
+  (p) => !submittedUserIdsFromLoadedSubmissions.has(p.user_id)
 );
   // ───────────────── RENDER ─────────────────
 
@@ -1159,22 +1284,52 @@ const playersWithoutSubmissions: LobbyPlayer[] = uniqueActivePlayers.filter(
 
   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
     {Array.from(new Map(players.map((p) => [p.user_id, p])).values()).map(
-      (player, index) => (
-        <span
-          key={player.user_id}
-          style={{
-            padding: "6px 10px",
-            borderRadius: 999,
-            border: "1px solid rgba(255,255,255,0.18)",
-            background: "rgba(255,255,255,0.06)",
-            color: "#e5e7eb",
-            fontSize: "0.85rem",
-            fontWeight: 700,
-          }}
-        >
-          {playerNamesById[player.user_id] ?? `Player ${index + 1}`}
-        </span>
-      )
+      (player, index) => {
+        const profile = playerProfilesById[player.user_id];
+        const displayName = profile?.displayName ?? `Player ${index + 1}`;
+        const rating = profile?.rating ?? 0;
+        const rank = getRankFromRating(rating);
+        const hasSubmitted = submittedUserIds.has(player.user_id);
+
+        return (
+          <span
+            key={player.user_id}
+            style={{
+              padding: "7px 11px",
+              borderRadius: 999,
+              border: hasSubmitted
+                ? "1px solid rgba(34,197,94,0.9)"
+                : "1px solid rgba(255,255,255,0.18)",
+              background: hasSubmitted
+                ? "rgba(34,197,94,0.22)"
+                : "rgba(255,255,255,0.06)",
+              color: hasSubmitted ? "#86efac" : "#e5e7eb",
+              fontSize: "0.85rem",
+              fontWeight: 800,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              boxShadow: hasSubmitted
+                ? "0 0 16px rgba(34,197,94,0.25)"
+                : "none",
+            }}
+            title={hasSubmitted ? "Beat submitted" : "Waiting for submission"}
+          >
+            <span
+              style={{
+                fontSize: "0.7rem",
+                color: hasSubmitted ? "#bbf7d0" : "#9ca3af",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+              }}
+            >
+              {rank}
+            </span>
+            <span>{displayName}</span>
+            {hasSubmitted && <span style={{ color: "#22c55e" }}>✓</span>}
+          </span>
+        );
+      }
     )}
   </div>
 </div>

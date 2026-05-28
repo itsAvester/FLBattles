@@ -104,6 +104,13 @@ function getRankFromRating(rating: number | null | undefined): string {
 
 function getRankTheme(rank: string) {
   switch (rank) {
+    case "Top 10":
+      return {
+        text: "#050505",
+        border: "rgba(255, 77, 28, 0.95)",
+        background: "linear-gradient(90deg, #ff4d1c 0%, #f6c65b 100%)",
+        glow: "0 0 20px rgba(255, 77, 28, 0.28)",
+      };
     case "Ruby":
       return {
         text: "#fda4af",
@@ -250,6 +257,7 @@ const playSubmitDing = () => {
   const [playerProfilesById, setPlayerProfilesById] = useState<
   Record<string, { displayName: string; rating: number }>
 >({});
+const [topTenUserIds, setTopTenUserIds] = useState<Set<string>>(new Set());
 const [submittedUserIds, setSubmittedUserIds] = useState<Set<string>>(new Set());
 const submittedUsersLoadedRef = useRef(false);
   const [lobbyError, setLobbyError] = useState<string | null>(null);
@@ -331,6 +339,7 @@ const submittedUsersLoadedRef = useRef(false);
     setStatsUpdated(false);
     setSubmissions([]);
     setSubmittedUserIds(new Set());
+    setTopTenUserIds(new Set());
     submittedUsersLoadedRef.current = false;
     setLoadingSubmissions(false);
     setVoteSubmitting(false);
@@ -359,6 +368,18 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
   if (error) {
     console.error("Failed to load player profiles:", error);
     return;
+  }
+
+  const { data: topTenProfiles, error: topTenError } = await supabase
+    .from("profiles")
+    .select("id")
+    .order("rating", { ascending: false, nullsFirst: false })
+    .limit(10);
+
+  if (topTenError) {
+    console.error("Failed to load top 10 profiles:", topTenError);
+  } else {
+    setTopTenUserIds(new Set((topTenProfiles ?? []).map((profile: any) => profile.id)));
   }
 
   const profileMap: Record<string, { displayName: string; rating: number }> = {};
@@ -1473,7 +1494,8 @@ const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers
                   const profile = playerProfilesById[player.user_id];
                   const displayName = profile?.displayName ?? `Player ${index + 1}`;
                   const rating = profile?.rating ?? 0;
-                  const rank = getRankFromRating(rating);
+                  const ratingRank = getRankFromRating(rating);
+                  const rank = topTenUserIds.has(player.user_id) ? "Top 10" : ratingRank;
                   const rankTheme = getRankTheme(rank);
                   const hasSubmitted = submittedUserIds.has(player.user_id);
 

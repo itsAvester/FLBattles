@@ -296,10 +296,11 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
       }
 
       const { data: playersData, error: playersErr } = await supabase
-        .from("battle_lobby_players")
-        .select("*")
-        .eq("lobby_id", battleId)
-        .order("joined_at", { ascending: true });
+  .from("battle_lobby_players")
+  .select("*")
+  .eq("lobby_id", battleId)
+  .is("left_at", null)
+  .order("joined_at", { ascending: true });
 
       if (!playersErr && playersData) {
   const playerRows = playersData as LobbyPlayer[];
@@ -345,30 +346,31 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
       .subscribe();
 
     const playersChannel = supabase
-      .channel(`battle_lobby_players:${battleId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "battle_lobby_players",
-          filter: `lobby_id=eq.${battleId}`,
-        },
-        async () => {
-          const { data: playersData } = await supabase
-            .from("battle_lobby_players")
-            .select("*")
-            .eq("lobby_id", battleId)
-            .order("joined_at", { ascending: true });
+  .channel(`battle_lobby_players:${battleId}`)
+  .on(
+    "postgres_changes",
+    {
+      event: "*",
+      schema: "public",
+      table: "battle_lobby_players",
+      filter: `lobby_id=eq.${battleId}`,
+    },
+    async () => {
+      const { data: playersData } = await supabase
+        .from("battle_lobby_players")
+        .select("*")
+        .eq("lobby_id", battleId)
+        .is("left_at", null)
+        .order("joined_at", { ascending: true });
 
-          if (playersData) {
-  const playerRows = playersData as LobbyPlayer[];
-  setPlayers(playerRows);
-  await loadPlayerNames(playerRows);
-}
-        }
-      )
-      .subscribe();
+      if (playersData) {
+        const playerRows = playersData as LobbyPlayer[];
+        setPlayers(playerRows);
+        await loadPlayerNames(playerRows);
+      }
+    }
+  )
+  .subscribe();
 
     return () => {
       supabase.removeChannel(lobbyChannel);

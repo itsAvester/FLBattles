@@ -1579,130 +1579,113 @@ const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers
         )}
       </div>
 
-      {/* TIMER */}
+      {/* PRODUCTION / UPLOAD PHASE */}
       {matchStarted && phase !== "results" && (
-        <p className="highlight">
-          Time left to produce: {minutes}:{seconds}
-        </p>
-      )}
-
-      {!matchStarted && (
-        <p style={{ marginBottom: 12 }}>
-          Waiting for enough players to start the battle. Once the battle
-          starts, you&apos;ll get a sample and a 15-minute timer to make
-          your beat.
-        </p>
-      )}
-
-      {/* COUNTDOWN & UPLOAD PHASES */}
-      {matchStarted && (phase === "countdown" || phase === "upload") && (
-        <>
-          <p>
-            Open FL Studio on your computer and use the sample below to
-            create a beat. You can upload your clip at any time during the
-            15-minute window. Once you upload, you&apos;re locked in for
-            this battle.
-          </p>
-
-          <div className="sample-box">
-            <h3>Sample for this battle</h3>
-
-            {sampleLoading && (
-              <p style={{ color: "#9ca3af" }}>Loading sample...</p>
-            )}
-
-            {sampleError && (
-              <p style={{ color: "#f97373" }}>
-                Failed to load sample: {sampleError}
-              </p>
-            )}
-
-            {!sampleLoading && !sampleError && sampleUrl && (
-              <>
-                <p style={{ marginBottom: 8 }}>
-                  Sample file: <strong>{sampleName}</strong>
-                </p>
-
-                <audio controls style={{ width: "100%" }}>
-                  <source src={sampleUrl} />
-                  Your browser does not support the audio element.
-                </audio>
-
-                <p
-                  style={{
-                    marginTop: 8,
-                    fontSize: "0.9rem",
-                    color: "#9ca3af",
-                  }}
-                >
-                  Download this sample and drop it into FL Studio to start
-                  your beat.
-                </p>
-              </>
-            )}
-          </div>
-
-          {/* UPLOAD UI */}
-          <div style={{ marginTop: 16 }}>
-            <h3>Upload your track</h3>
-            <p style={{ fontSize: "0.9rem", color: "#9ca3af" }}>
-              Accepted: mp3, wav, etc. You can replace your upload during
-              the 15-minute window.
-            </p>
-
-            <input
-              type="file"
-              accept="audio/*"
-              onChange={handleFileChange}
-              disabled={!uploadWindowOpen || uploading || uploadDone}
-              style={{ marginTop: 8 }}
-            />
-
-            <div style={{ marginTop: 8 }}>
-              <button
-                onClick={handleUpload}
-                className="btn-primary"
-                disabled={
-                  !uploadWindowOpen || uploading || uploadDone || !file
-                }
-              >
-                {uploading
-                  ? "Uploading..."
-                  : uploadDone
-                  ? "Uploaded"
-                  : "Upload Track"}
-              </button>
+        <section className="battle-production-panel">
+          <div className="battle-production-topbar">
+            <div>
+              <p className="battle-lobby-section-label">Production phase</p>
+              <h3 className="battle-production-title">Make your beat</h3>
             </div>
 
-            {uploadError && (
-              <p style={{ color: "#f97373", marginTop: 6 }}>{uploadError}</p>
-            )}
-
-            {!uploadWindowOpen && !uploadDone && (
-              <p
-                style={{
-                  color: "#f97373",
-                  marginTop: 6,
-                  fontSize: "0.9rem",
-                }}
-              >
-                Upload window has closed for this battle.
-              </p>
-            )}
-
-            {uploadDone && (
-              <p
-                style={{
-                  color: "#22c55e",
-                  marginTop: 6,
-                  fontSize: "0.9rem",
-                }}
-              >
-                Upload successful! Voting phase will begin shortly.
-              </p>
-            )}
+            <div className="battle-production-timer">
+              <span>Time left</span>
+              <strong>{minutes}:{seconds}</strong>
+            </div>
           </div>
-        </>
+
+          <p className="battle-production-description">
+            Use the shared sample below, create your clip in FL Studio, and upload before the timer ends.
+          </p>
+
+          <div className="battle-production-grid">
+            <div className="battle-sample-card">
+              <div className="battle-sample-card-head">
+                <div>
+                  <p className="battle-lobby-section-label">Battle sample</p>
+                  <h4>Sample for this battle</h4>
+                </div>
+                {sampleUrl && <span className="battle-sample-ready-chip">Ready</span>}
+              </div>
+
+              {sampleLoading && (
+                <p className="battle-production-muted">Loading sample...</p>
+              )}
+
+              {sampleError && (
+                <p className="battle-production-error">
+                  Failed to load sample: {sampleError}
+                </p>
+              )}
+
+              {!sampleLoading && !sampleError && sampleUrl && (
+                <>
+                  <p className="battle-sample-file-name">
+                    {sampleName}
+                  </p>
+
+                  <audio controls className="battle-audio-player">
+                    <source src={sampleUrl} />
+                    Your browser does not support the audio element.
+                  </audio>
+
+                  <p className="battle-production-muted">
+                    Download the sample and drop it into FL Studio to start your beat.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="battle-upload-card">
+              <div className="battle-upload-card-head">
+                <div>
+                  <p className="battle-lobby-section-label">Submission</p>
+                  <h4>Upload your track</h4>
+                </div>
+                <span className={uploadDone ? "battle-upload-status-chip battle-upload-status-done" : "battle-upload-status-chip"}>
+                  {uploadDone ? "Uploaded" : uploadWindowOpen ? "Open" : "Closed"}
+                </span>
+              </div>
+
+              <p className="battle-production-muted">
+                Accepted: mp3, wav, and other audio files. You can replace your upload during the 15-minute window.
+              </p>
+
+              <div className="battle-file-input-wrap">
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleFileChange}
+                  disabled={!uploadWindowOpen || uploading || uploadDone}
+                />
+              </div>
+
+              <button
+                onClick={handleUpload}
+                className="btn-primary battle-upload-button"
+                disabled={!uploadWindowOpen || uploading || uploadDone || !file}
+              >
+                {uploading ? "Uploading..." : uploadDone ? "Uploaded" : "Upload Track"}
+              </button>
+
+              {uploadError && (
+                <p className="battle-production-error">{uploadError}</p>
+              )}
+
+              {!uploadWindowOpen && !uploadDone && (
+                <p className="battle-production-error">
+                  Upload window has closed for this battle.
+                </p>
+              )}
+
+              {uploadDone && (
+                <p className="battle-production-success">
+                  Upload successful. Voting phase will begin shortly.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
       )}
 
       {/* RESULTS PHASE */}

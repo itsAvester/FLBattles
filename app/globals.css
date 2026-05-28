@@ -1568,3 +1568,346 @@ a.btn-secondary:hover {
     font-size: 2rem;
   }
 }
+
+/* =========================================================
+   COMPACT BATTLE LOBBY OVERRIDES
+   Keeps the battle/sample/upload area visible on first load.
+   ========================================================= */
+
+.battle-lobby-hero {
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 18px;
+  padding: 18px 28px 16px;
+}
+
+.battle-lobby-hero-topline {
+  margin-bottom: 10px;
+}
+
+.battle-lobby-eyebrow,
+.battle-lobby-mode-pill,
+.battle-lobby-tag,
+.battle-lobby-status-chip {
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 0.68rem;
+}
+
+.battle-lobby-title {
+  font-size: clamp(2rem, 3.1vw, 3rem);
+  line-height: 0.92;
+}
+
+.battle-lobby-description {
+  max-width: 780px;
+  margin-top: 10px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.battle-lobby-id-card {
+  padding: 10px 12px;
+}
+
+.battle-lobby-id-value {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.battle-lobby-status-box {
+  padding: 18px 28px 18px;
+}
+
+.battle-lobby-status-title {
+  margin-top: 8px;
+  font-size: clamp(1.65rem, 2.35vw, 2.25rem);
+}
+
+.battle-lobby-stat-grid {
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.battle-lobby-stat-card {
+  padding: 14px 14px 12px;
+}
+
+.battle-lobby-stat-value {
+  margin-top: 10px;
+  font-size: clamp(1.45rem, 2.2vw, 2rem);
+}
+
+.battle-lobby-stat-value-text {
+  font-size: clamp(1.25rem, 1.9vw, 1.7rem);
+}
+
+.battle-lobby-player-list-card {
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.battle-lobby-player-chip-row {
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.battle-lobby-player-chip {
+  min-height: 36px;
+  padding: 6px 10px;
+}
+
+.battle-lobby-rank-pill {
+  min-height: 22px;
+  padding: 0 7px;
+  font-size: 0.64rem;
+}
+
+.battle-lobby-player-name {
+  font-size: 0.9rem;
+}
+
+.battle-lobby-matchmaking-card {
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.battle-lobby-matchmaking-title {
+  margin-top: 8px;
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+}
+
+.battle-lobby-mini-queue-box {
+  min-width: 120px;
+  padding: 10px 12px;
+}
+
+.battle-lobby-mini-queue-value {
+  font-size: 1.35rem;
+}
+
+.battle-lobby-progress-block {
+  margin-top: 12px;
+}
+
+.battle-lobby-progress-track {
+  height: 10px;
+}
+
+.battle-lobby-progress-track-secondary {
+  height: 8px;
+}
+
+.battle-lobby-matchmaking-footnote {
+  margin-top: 12px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.battle-production-panel {
+  margin: 18px 28px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(140, 255, 107, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.battle-production-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.battle-production-title {
+  margin: 8px 0 0;
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.45rem, 2vw, 2rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+
+.battle-production-timer {
+  min-width: 156px;
+  padding: 10px 12px;
+  border: 1px solid rgba(140, 255, 107, 0.32);
+  background: rgba(140, 255, 107, 0.08);
+  text-align: right;
+}
+
+.battle-production-timer span {
+  display: block;
+  color: var(--muted-2);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.battle-production-timer strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--green);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.65rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.battle-production-description {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.battle-production-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.battle-sample-card,
+.battle-upload-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.battle-sample-card-head,
+.battle-upload-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.battle-sample-card h4,
+.battle-upload-card h4 {
+  margin: 7px 0 0;
+  font-size: 1.08rem;
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.battle-sample-ready-chip,
+.battle-upload-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(140, 255, 107, 0.32);
+  background: rgba(140, 255, 107, 0.08);
+  color: var(--green);
+  font-size: 0.66rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.battle-upload-status-chip {
+  border-color: rgba(246, 198, 91, 0.32);
+  background: rgba(246, 198, 91, 0.08);
+  color: var(--gold);
+}
+
+.battle-upload-status-done {
+  border-color: rgba(34, 197, 94, 0.36);
+  background: rgba(34, 197, 94, 0.10);
+  color: #86efac;
+}
+
+.battle-sample-file-name {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 0.96rem;
+  font-weight: 900;
+}
+
+.battle-audio-player {
+  width: 100%;
+  height: 40px;
+  display: block;
+  margin: 8px 0 10px;
+}
+
+.battle-production-muted {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.battle-production-error {
+  margin: 9px 0 0;
+  color: #f97373;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.battle-production-success {
+  margin: 9px 0 0;
+  color: #22c55e;
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.battle-file-input-wrap {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.battle-file-input-wrap input {
+  width: 100%;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.battle-file-input-wrap input::file-selector-button {
+  min-height: 32px;
+  margin-right: 10px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.battle-upload-button {
+  width: 100%;
+  margin-top: 12px;
+}
+
+@media (max-width: 980px) {
+  .battle-production-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .battle-production-panel {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+
+  .battle-production-timer {
+    width: 100%;
+    text-align: left;
+  }
+}

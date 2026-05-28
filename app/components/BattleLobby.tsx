@@ -187,6 +187,11 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
   const isRanked = mode !== "custom";
 const playedStartSoundFor = useRef<string | null>(null);
 const votingSectionRef = useRef<HTMLDivElement | null>(null);
+const previousPlayerIdsRef = useRef<Set<string>>(new Set());
+const playersLoadedOnceRef = useRef(false);
+const minPlayersSoundPlayedRef = useRef(false);
+const oneMinuteWarningPlayedRef = useRef(false);
+const finalCountdownPlayedForRef = useRef<Set<number>>(new Set());
 
 const playMatchStartSound = () => {
   try {
@@ -250,6 +255,64 @@ const playSubmitDing = () => {
   } catch (err) {
     console.warn("Could not play submit ding:", err);
   }
+};
+
+const playTone = (
+  frequency: number,
+  duration = 0.16,
+  type: OscillatorType = "sine",
+  volume = 0.14
+) => {
+  try {
+    const AudioContextClass =
+      window.AudioContext || (window as any).webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    const audioCtx = new AudioContextClass();
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+    gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(volume, audioCtx.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + duration);
+  } catch (err) {
+    console.warn("Could not play sound:", err);
+  }
+};
+
+const playOneMinuteWarningSound = () => {
+  playTone(440, 0.18, "triangle", 0.12);
+  window.setTimeout(() => playTone(660, 0.2, "triangle", 0.12), 160);
+};
+
+const playCountdownDink = () => {
+  playTone(980, 0.08, "square", 0.08);
+};
+
+const playPlayerJoinSound = () => {
+  playTone(520, 0.12, "sine", 0.11);
+  window.setTimeout(() => playTone(780, 0.13, "sine", 0.1), 90);
+};
+
+const playPlayerLeaveSound = () => {
+  playTone(420, 0.14, "triangle", 0.1);
+  window.setTimeout(() => playTone(260, 0.16, "triangle", 0.09), 100);
+};
+
+const playMinPlayersFoundSound = () => {
+  playTone(523, 0.12, "sawtooth", 0.11);
+  window.setTimeout(() => playTone(659, 0.12, "sawtooth", 0.11), 110);
+  window.setTimeout(() => playTone(784, 0.2, "sawtooth", 0.12), 220);
 };
   // lobby state
   const [lobby, setLobby] = useState<Lobby | null>(null);
@@ -350,6 +413,11 @@ const submittedUsersLoadedRef = useRef(false);
     setVotingTimeLeft(VOTING_TIME);
     setLeaving(false);
     setLeaveError(null);
+    previousPlayerIdsRef.current = new Set();
+    playersLoadedOnceRef.current = false;
+    minPlayersSoundPlayedRef.current = false;
+    oneMinuteWarningPlayedRef.current = false;
+    finalCountdownPlayedForRef.current = new Set();
   }, [battleId]);
 
   // ───────────────── LOBBY: fetch & realtime ─────────────────
@@ -863,6 +931,24 @@ useEffect(() => {
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [lobby?.status, lobby?.battle_started_at, debugStartTime, phase]);
+
+  useEffect(() => {
+    if (!matchStarted || phase !== "countdown") return;
+
+    if (timeLeft === 60 && !oneMinuteWarningPlayedRef.current) {
+      oneMinuteWarningPlayedRef.current = true;
+      playOneMinuteWarningSound();
+    }
+
+    if (
+      timeLeft <= 10 &&
+      timeLeft > 0 &&
+      !finalCountdownPlayedForRef.current.has(timeLeft)
+    ) {
+      finalCountdownPlayedForRef.current.add(timeLeft);
+      playCountdownDink();
+    }
+  }, [timeLeft, matchStarted, phase]);
 
   // Visible voting timer. The database is still the authority via voting_ends_at.
   useEffect(() => {
@@ -1414,6 +1500,45 @@ const playersNeeded = Math.max(minPlayers - playerCount, 0);
 const queueReady = !!lobby && lobby.status === "searching" && playerCount >= minPlayers;
 const queueFillPercent = minPlayers > 0 ? Math.min((playerCount / minPlayers) * 100, 100) : 0;
 const lobbyCapacityPercent = maxPlayers > 0 ? Math.min((playerCount / maxPlayers) * 100, 100) : 0;
+useEffect(() => {
+  if (!lobby) return;
+
+  const currentIds = new Set(uniqueActivePlayers.map((p) => p.user_id));
+  const previousIds = previousPlayerIdsRef.current;
+
+  if (!playersLoadedOnceRef.current) {
+    previousPlayerIdsRef.current = currentIds;
+    playersLoadedOnceRef.current = true;
+    return;
+  }
+
+  const joined = Array.from(currentIds).filter((id) => !previousIds.has(id));
+  const left = Array.from(previousIds).filter((id) => !currentIds.has(id));
+
+  if (lobby.status === "searching") {
+    if (
+      playerCount >= minPlayers &&
+      minPlayers > 0 &&
+      !minPlayersSoundPlayedRef.current
+    ) {
+      playMinPlayersFoundSound();
+      minPlayersSoundPlayedRef.current = true;
+    } else if (joined.length > 0 && playerCount > minPlayers) {
+      playPlayerJoinSound();
+    }
+
+    if (left.length > 0) {
+      playPlayerLeaveSound();
+    }
+
+    if (playerCount < minPlayers) {
+      minPlayersSoundPlayedRef.current = false;
+    }
+  }
+
+  previousPlayerIdsRef.current = currentIds;
+}, [lobby, playerCount, minPlayers, uniqueActivePlayers]);
+
   // ───────────────── RENDER ─────────────────
 
   return (

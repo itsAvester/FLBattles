@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <NavBar />
         <div className="beta-banner">
   <span className="beta-pill">BETA</span>
-  <span>FL Battles is currently in beta. Features, rankings, and battle flow may change during testing.</span>
+  <span>Fixed issues with queue and submitting beats!</span>
 </div>
         <main className="page">{children}</main>
         <Analytics />

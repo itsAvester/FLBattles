@@ -3197,7 +3197,7 @@ a.btn-secondary:hover {
    LOGIN PAGE MOBILE FIX
    Prevents auth card from becoming a skinny sidebar
    ========================================================= */
-
+/*
 .login-page-shell {
   min-height: calc(100vh - 60px);
   display: flex;
@@ -3311,4 +3311,4 @@ a.btn-secondary:hover {
   .login-auth-card button {
     width: 100% !important;
   }
-}
+}*/

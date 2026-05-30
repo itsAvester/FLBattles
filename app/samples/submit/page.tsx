@@ -16,11 +16,15 @@ const ACCEPTED_AUDIO_TYPES = [
   "audio/x-m4a",
 ];
 
+const SAMPLE_RIGHTS_AGREEMENT =
+  "I confirm that I created this sample, own or control all necessary rights to it, and have the legal authority to submit it to FL Battles. I also grant FL Battles permission to review, store, stream, display, and, if approved, make this sample available for use in FL Battles competitions. I understand that I am responsible for the content I upload and that samples containing uncleared third-party material may be rejected or removed.";
+
 export default function SubmitSamplePage() {
   const router = useRouter();
 
   const [sampleFile, setSampleFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -45,6 +49,13 @@ export default function SubmitSamplePage() {
 
     if (sampleFile.size > maxFileSize) {
       setErrorMsg("Please keep sample files under 50 MB.");
+      return;
+    }
+
+    if (!rightsConfirmed) {
+      setErrorMsg(
+        "Please confirm that you own or control the rights to this sample before submitting."
+      );
       return;
     }
 
@@ -91,6 +102,11 @@ export default function SubmitSamplePage() {
           original_filename: sampleFile.name,
           status: "pending",
           notes: notes.trim() || null,
+
+          // Rights confirmation record
+          rights_confirmed: true,
+          rights_confirmed_at: new Date().toISOString(),
+          rights_agreement_text: SAMPLE_RIGHTS_AGREEMENT,
         });
 
       if (insertError) {
@@ -102,6 +118,7 @@ export default function SubmitSamplePage() {
 
       setSampleFile(null);
       setNotes("");
+      setRightsConfirmed(false);
       setSuccessMsg("Sample submitted. It is now pending review.");
     } catch (err: any) {
       console.error("Unexpected sample submission error:", err);
@@ -256,6 +273,87 @@ export default function SubmitSamplePage() {
             />
           </label>
 
+          <section
+            style={{
+              border: "1px solid rgba(255, 255, 255, 0.14)",
+              background:
+                "linear-gradient(135deg, rgba(255, 77, 28, 0.08), rgba(255, 255, 255, 0.035))",
+              padding: 16,
+              display: "grid",
+              gap: 12,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 12,
+              }}
+            >
+              <input
+                id="rights-confirmation"
+                type="checkbox"
+                checked={rightsConfirmed}
+                onChange={(e) => setRightsConfirmed(e.target.checked)}
+                disabled={uploading}
+                style={{
+                  marginTop: 4,
+                  width: 18,
+                  height: 18,
+                  accentColor: "var(--accent)",
+                  cursor: uploading ? "not-allowed" : "pointer",
+                  flex: "0 0 auto",
+                }}
+              />
+
+              <label
+                htmlFor="rights-confirmation"
+                style={{
+                  display: "grid",
+                  gap: 8,
+                  cursor: uploading ? "not-allowed" : "pointer",
+                }}
+              >
+                <span
+                  style={{
+                    color: "var(--text)",
+                    fontSize: "0.88rem",
+                    fontWeight: 900,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  Rights confirmation required
+                </span>
+
+                <span
+                  style={{
+                    color: "var(--muted)",
+                    fontSize: "0.92rem",
+                    fontWeight: 650,
+                    lineHeight: 1.65,
+                  }}
+                >
+                  {SAMPLE_RIGHTS_AGREEMENT}
+                </span>
+              </label>
+            </div>
+
+            <p
+              style={{
+                margin: 0,
+                color: "rgba(255, 255, 255, 0.52)",
+                fontSize: "0.78rem",
+                fontWeight: 650,
+                lineHeight: 1.55,
+              }}
+            >
+              Do not upload copyrighted loops, melodies, drums, vocals, or other
+              audio unless you created them yourself or have permission to submit
+              them for this use.
+            </p>
+          </section>
+
           {errorMsg && (
             <p
               style={{
@@ -291,7 +389,20 @@ export default function SubmitSamplePage() {
           )}
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button type="submit" className="btn-primary" disabled={uploading}>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={uploading || !rightsConfirmed}
+              title={
+                !rightsConfirmed
+                  ? "Confirm that you own or control the rights before submitting."
+                  : undefined
+              }
+              style={{
+                opacity: uploading || !rightsConfirmed ? 0.62 : 1,
+                cursor: uploading || !rightsConfirmed ? "not-allowed" : "pointer",
+              }}
+            >
               {uploading ? "Submitting..." : "Submit Sample"}
             </button>
 

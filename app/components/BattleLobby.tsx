@@ -802,7 +802,66 @@ useEffect(() => {
 
   return () => clearInterval(interval);
 }, [battleId]);
+// Automatically advance lobby phases while users are in a battle lobby.
+// This keeps lobbies moving from searching → in_progress → voting → finished.
+useEffect(() => {
+  if (!battleId) return;
 
+  const advanceLobbies = async () => {
+    const { error } = await supabase.rpc("advance_battle_lobbies");
+
+    if (error) {
+      console.error("Failed to advance battle lobbies:", error);
+    }
+  };
+
+  // Run once immediately when the lobby page loads
+  advanceLobbies();
+
+  // Then run every 3 seconds while the user is on this lobby page
+  const interval = setInterval(advanceLobbies, 3000);
+
+  return () => clearInterval(interval);
+}, [battleId]);
+
+// Keep this player marked as active while they are inside the lobby.
+// This lets Supabase clean up players who close the tab or disconnect.
+useEffect(() => {
+  if (!battleId) return;
+
+  let cancelled = false;
+
+  const heartbeat = async () => {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (cancelled || userError || !user) return;
+
+    const { error } = await supabase
+      .from("battle_lobby_players")
+      .update({
+        last_seen_at: new Date().toISOString(),
+      })
+      .eq("lobby_id", battleId)
+      .eq("user_id", user.id)
+      .is("left_at", null);
+
+    if (error) {
+      console.error("Failed to update lobby heartbeat:", error);
+    }
+  };
+
+  heartbeat();
+
+  const interval = window.setInterval(heartbeat, 15000);
+
+  return () => {
+    cancelled = true;
+    window.clearInterval(interval);
+  };
+}, [battleId]);
   // Debug: force start lobby on THIS CLIENT ONLY
   // (Does not rely on DB or RPC. Perfect for solo dev testing.)
   const handleDebugForceStart = async () => {

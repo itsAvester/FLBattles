@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import NavBar from "./components/NavBar";
 import { Manrope } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next"
-
+import RegisteredProducerCount from "./components/RegisteredProducerCount";
 const manrope = Manrope({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <NavBar />
         <div className="beta-banner">
   <span className="beta-pill">BETA</span>
-  <span>1500+ Producers Already Playing</span>
+  <span><RegisteredProducerCount suffix="+ producers" /> Producers Already Playing</span>
 </div>
         <main className="page">{children}</main>
         <Analytics />

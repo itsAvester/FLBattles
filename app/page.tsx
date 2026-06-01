@@ -1,5 +1,5 @@
 // app/page.tsx
-
+import RegisteredProducerCount from "./components/RegisteredProducerCount";
 export default function HomePage() {
   return (
     <main className="home-shell">
@@ -35,7 +35,9 @@ export default function HomePage() {
            <div className="hero-stats">
   <div className="hero-stat-item">
     <div className="hero-stat-icon">♙</div>
-    <strong>1458+</strong>
+    <strong>
+  <RegisteredProducerCount suffix="+" />
+</strong>
     <span>Producers</span>
   </div>
 
@@ -59,8 +61,7 @@ export default function HomePage() {
 </div>
 
             <p className="mini-note">
-              Join 1458+ registered producers competing in live ranked
-              sample-flip battles.
+              Join <RegisteredProducerCount suffix="+" /> registered producers competing in live ranked sample-flip battles.
             </p>
           </div>
 
@@ -71,7 +72,9 @@ export default function HomePage() {
                 <span />
                 <span />
               </div>
-              <span className="window-title">1458+ PRODUCERS REGISTERED</span>
+              <span className="window-title">
+  <RegisteredProducerCount suffix="+" /> PRODUCERS REGISTERED
+</span>
               <span className="window-status">RANKED</span>
             </div>
 

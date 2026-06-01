@@ -9,13 +9,13 @@ export default function HomePage() {
           <div className="hero-copy">
             <div className="eyebrow">
               <span className="eyebrow-dot" />
-              Ranked sample flip battles · real-time matchmaking
+              Ranked sample beat battles · real-time matchmaking
             </div>
 
             <h1>
               Live Sample
               <br />
-              Flip Battles
+              Beat Battles
             </h1>
 
             <p className="hero-description">
@@ -55,7 +55,7 @@ export default function HomePage() {
 </div>
 
             <p className="mini-note">
-              Join <RegisteredProducerCount suffix="+" /> registered producers competing in live ranked sample-flip battles.
+              Join <RegisteredProducerCount suffix="+" /> registered producers competing in live ranked sample-flip beat battles.
             </p>
           </div>
 

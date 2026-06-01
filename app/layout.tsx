@@ -22,8 +22,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <NavBar />
         <div className="beta-banner">
-  <span className="beta-pill">BETA</span>
-  <span><RegisteredProducerCount suffix="+ Producers" /> Already Playing</span>
+  <span className="beta-pill">LIVE BETA</span>
+  <span><RegisteredProducerCount suffix="+ Producers" /> Competing</span>
 </div>
         <main className="page">{children}</main>
         <Analytics />

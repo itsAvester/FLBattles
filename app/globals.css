@@ -3401,3 +3401,788 @@ a.btn-secondary:hover {
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
+.hero-visual-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.live-activity-card {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid var(--line-bright);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(140, 255, 107, 0.08), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent),
+    rgba(2, 2, 2, 0.82);
+  box-shadow:
+    0 30px 90px var(--shadow),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.live-activity-header {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(5, 5, 5, 0.78);
+}
+
+.live-activity-header div {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.live-activity-header a {
+  color: var(--orange);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.activity-dot {
+  width: 6px;
+  height: 6px;
+  display: inline-block;
+  background: var(--orange);
+  box-shadow: 0 0 16px rgba(255, 77, 28, 0.65);
+}
+
+.activity-list {
+  display: grid;
+}
+
+.activity-row {
+  min-height: 78px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.activity-row:last-child {
+  border-bottom: 0;
+}
+
+.activity-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 1rem;
+  border: 1px solid rgba(255, 77, 28, 0.45);
+  background: rgba(255, 77, 28, 0.07);
+  color: var(--orange);
+}
+
+.activity-icon-battle_win {
+  border-color: rgba(255, 77, 28, 0.45);
+  background: rgba(255, 77, 28, 0.08);
+}
+
+.activity-icon-battle_complete {
+  border-color: rgba(255, 77, 28, 0.35);
+  background: rgba(255, 77, 28, 0.06);
+}
+
+.activity-icon-submission {
+  border-color: rgba(140, 255, 107, 0.35);
+  background: rgba(140, 255, 107, 0.07);
+}
+
+.activity-icon-sample {
+  border-color: rgba(246, 198, 91, 0.42);
+  background: rgba(246, 198, 91, 0.07);
+}
+
+.activity-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.activity-copy strong {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.activity-copy span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.activity-time {
+  color: var(--muted-2);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.activity-empty {
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 1180px) {
+  .hero-visual-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .live-activity-card {
+    max-width: 720px;
+  }
+}
+
+@media (max-width: 720px) {
+  .activity-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .activity-time {
+    grid-column: 2;
+  }
+}
+.activity-header-tag {
+  color: var(--green);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.activity-profile-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.075);
+  color: var(--orange);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.activity-profile-link:hover {
+  color: var(--text);
+  background: rgba(255, 77, 28, 0.06);
+}
+
+.activity-copy strong {
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.activity-copy span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.activity-time {
+  color: var(--muted-2);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.champions-card {
+  border: 1px solid var(--line-bright);
+  background:
+    radial-gradient(circle at top right,
+      rgba(255, 77, 28, 0.08),
+      transparent 40%),
+    rgba(5, 5, 5, 0.82);
+
+  min-height: 640px;
+}
+
+.champions-header {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+
+  border-bottom: 1px solid var(--line);
+
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.champions-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.champion-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  padding: 18px 20px;
+
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.champion-avatar {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 999px;
+
+  background: rgba(255,77,28,0.08);
+
+  border: 1px solid rgba(255,77,28,0.3);
+}
+
+.champion-info strong {
+  display: block;
+  color: white;
+}
+
+.champion-info span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.recent-champions-card {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid var(--line-bright);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 77, 28, 0.08), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent),
+    rgba(2, 2, 2, 0.82);
+  box-shadow:
+    0 30px 90px var(--shadow),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.recent-champions-header {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(5, 5, 5, 0.78);
+}
+
+.recent-champions-header div {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.recent-champions-list {
+  display: grid;
+}
+
+.recent-champion-row {
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.recent-champion-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--orange);
+  border: 1px solid rgba(255, 77, 28, 0.45);
+  background: rgba(255, 77, 28, 0.08);
+}
+
+.recent-champion-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.recent-champion-copy strong {
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.recent-champion-copy span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.recent-champion-time {
+  color: var(--muted-2);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.recent-champions-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0 16px;
+  color: var(--orange);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-decoration: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.recent-champions-link:hover {
+  color: var(--text);
+  background: rgba(255, 77, 28, 0.06);
+}
+/* Homepage hero vertical alignment */
+.retro-hero {
+  min-height: calc(100vh - 120px);
+  align-items: flex-start;
+  padding: 28px 0 56px;
+}
+
+.hero-grid {
+  align-items: start;
+}
+
+.hero-copy,
+.hero-visual-stack {
+  padding-top: 18px;
+}
+
+.hero-visual-stack {
+  align-self: start;
+}
+
+/* Slightly tighten hero content */
+.hero-copy h1 {
+  font-size: clamp(4rem, 7.4vw, 7.7rem);
+}
+
+.hero-description {
+  margin-top: 22px;
+}
+
+.hero-actions {
+  margin-top: 24px;
+}
+
+.hero-stats {
+  margin-top: 30px;
+}
+/* =========================================================
+   HOME PAGE REFINEMENT OVERRIDES
+   Cleaner hero balance after removing Live Activity Feed
+   ========================================================= */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Make the hero feel less empty/tall on desktop */
+.retro-hero {
+  min-height: calc(100vh - 104px);
+  padding: 48px 0 52px;
+}
+
+/* Balance the hero now that the right side only has Recent Champions */
+.hero-grid {
+  grid-template-columns: minmax(0, 0.95fr) minmax(420px, 0.85fr);
+  gap: 54px;
+  align-items: center;
+}
+
+/* Center and intentionally size the remaining right-side panel */
+.hero-visual-stack {
+  width: 100%;
+  max-width: 520px;
+  justify-self: center;
+}
+
+/* Tighten hero spacing so stats are more likely to appear above the fold */
+.hero-description {
+  margin-top: 22px;
+}
+
+.hero-actions {
+  margin-top: 22px;
+}
+
+.hero-stats,
+.hero-stats-three {
+  margin-top: 22px;
+}
+
+/* Make the Recent Champions card feel like a premium homepage feature */
+.recent-champions-card {
+  width: 100%;
+}
+
+/* Slightly reduce row height so the panel fits better in the first viewport */
+.recent-champion-row {
+  min-height: 76px;
+}
+
+/* Keep anchor jump from hiding under sticky nav */
+#how-it-works {
+  scroll-margin-top: 96px;
+}
+
+/* Mobile/tablet preservation */
+@media (max-width: 980px) {
+  .retro-hero {
+    min-height: auto;
+    padding: 48px 0 52px;
+  }
+
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+
+  .hero-visual-stack {
+    max-width: 720px;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 720px) {
+  .retro-hero {
+    padding-top: 38px;
+  }
+
+  .hero-description {
+    margin-top: 20px;
+  }
+
+  .hero-actions {
+    margin-top: 22px;
+  }
+
+  .hero-stats,
+  .hero-stats-three {
+    margin-top: 22px;
+  }
+}
+/* =========================================================
+   HOME PAGE FINAL HERO BALANCE OVERRIDES
+   Widen Recent Champions, tighten hero, improve first viewport
+   ========================================================= */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Bring the homepage content slightly higher after the banner */
+.retro-hero {
+  min-height: calc(100vh - 104px);
+  padding: 36px 0 44px;
+}
+
+/* Rebalance the columns now that Live Activity was removed */
+.hero-grid {
+  grid-template-columns: minmax(0, 0.88fr) minmax(520px, 0.72fr);
+  gap: 64px;
+  align-items: center;
+}
+
+/* Make the remaining right-side card feel intentional and premium */
+.hero-visual-stack {
+  width: 100%;
+  max-width: 560px;
+  justify-self: center;
+}
+
+/* Keep the giant hero look, but prevent it from pushing stats too low */
+.hero-copy h1 {
+  font-size: clamp(4rem, 7.2vw, 7.4rem);
+}
+
+/* Tighter hero spacing so CTA + stats fit better on the first screen */
+.hero-description {
+  margin-top: 22px;
+}
+
+.hero-actions {
+  margin-top: 22px;
+}
+
+.hero-stats,
+.hero-stats-three {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Improve Recent Champions sizing */
+.recent-champions-card {
+  width: 100%;
+}
+
+/* Make champion rows more compact and reduce wrapping */
+.recent-champion-row {
+  min-height: 68px;
+  padding: 14px 18px;
+}
+
+/* Give the middle text area more room inside each row */
+.recent-champion-copy {
+  min-width: 0;
+}
+
+.recent-champion-copy strong,
+.recent-champion-copy span {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* Keep the timestamp from squeezing the username/copy too much */
+.recent-champion-time {
+  white-space: nowrap;
+}
+
+/* Prevent sticky nav from covering the section when clicking How It Works */
+#how-it-works {
+  scroll-margin-top: 96px;
+}
+
+/* Tablet */
+@media (max-width: 980px) {
+  .retro-hero {
+    min-height: auto;
+    padding: 48px 0 52px;
+  }
+
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+
+  .hero-visual-stack {
+    max-width: 720px;
+    justify-self: stretch;
+  }
+
+  .hero-copy h1 {
+    font-size: clamp(3.6rem, 15vw, 6.5rem);
+  }
+}
+
+/* Mobile */
+@media (max-width: 720px) {
+  .retro-hero {
+    padding-top: 38px;
+  }
+
+  .hero-description {
+    margin-top: 20px;
+  }
+
+  .hero-actions {
+    margin-top: 22px;
+  }
+
+  .hero-stats,
+  .hero-stats-three {
+    margin-top: 22px;
+  }
+
+  .recent-champion-row {
+    min-height: 72px;
+    padding: 14px;
+  }
+}
+/* =========================================================
+   HOME HERO WIDTH FIX
+   Force Recent Champions to be a wider, premium right-side panel
+   ========================================================= */
+
+/* Give the hero more horizontal room on desktop */
+.retro-hero .page-inner.hero-grid {
+  width: min(1320px, calc(100% - 40px)) !important;
+  max-width: 1320px !important;
+}
+
+/* Use a fixed right column so the champions card actually widens */
+.retro-hero .hero-grid {
+  grid-template-columns: minmax(0, 1fr) 560px !important;
+  gap: 72px !important;
+  align-items: center !important;
+}
+
+/* Force the visual stack and card to fill that 560px column */
+.retro-hero .hero-visual-stack {
+  width: 560px !important;
+  max-width: 560px !important;
+  min-width: 560px !important;
+  justify-self: start !important;
+}
+
+/* The card itself should not shrink */
+.retro-hero .recent-champions-card {
+  width: 560px !important;
+  max-width: none !important;
+  min-width: 560px !important;
+}
+
+/* Better header spacing inside the wider card */
+.retro-hero .recent-champions-header {
+  padding: 0 22px !important;
+}
+
+/* Wider, cleaner rows */
+.retro-hero .recent-champion-row {
+  display: grid !important;
+  grid-template-columns: 46px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 18px !important;
+  min-height: 72px !important;
+  padding: 14px 22px !important;
+}
+
+/* Keep trophy column consistent */
+.retro-hero .recent-champion-icon {
+  width: 40px !important;
+  height: 40px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Prevent ugly wrapping now that the card has room */
+.retro-hero .recent-champion-copy {
+  min-width: 0 !important;
+}
+
+.retro-hero .recent-champion-copy strong {
+  display: block !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.retro-hero .recent-champion-copy span {
+  display: block !important;
+  white-space: nowrap !important;
+}
+
+.retro-hero .recent-champion-time {
+  white-space: nowrap !important;
+  justify-self: end !important;
+}
+
+/* Slightly reduce the huge headline so the wider card has room */
+.retro-hero .hero-copy h1 {
+  font-size: clamp(4rem, 6.8vw, 7.15rem) !important;
+}
+
+/* Keep the stats higher and more connected */
+.retro-hero .hero-description {
+  margin-top: 22px !important;
+}
+
+.retro-hero .hero-actions {
+  margin-top: 22px !important;
+}
+
+.retro-hero .hero-stats,
+.retro-hero .hero-stats-three {
+  margin-top: 18px !important;
+  padding-top: 18px !important;
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Tablet: go back to stacked layout */
+@media (max-width: 1100px) {
+  .retro-hero .page-inner.hero-grid {
+    width: min(100% - 40px, 1180px) !important;
+  }
+
+  .retro-hero .hero-grid {
+    grid-template-columns: 1fr !important;
+    gap: 34px !important;
+  }
+
+  .retro-hero .hero-visual-stack,
+  .retro-hero .recent-champions-card {
+    width: 100% !important;
+    max-width: 720px !important;
+    min-width: 0 !important;
+    justify-self: stretch !important;
+  }
+}
+
+/* Mobile safety */
+@media (max-width: 720px) {
+  .retro-hero .page-inner.hero-grid {
+    width: 100% !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+
+  .retro-hero .hero-copy h1 {
+    font-size: clamp(3.1rem, 17vw, 5rem) !important;
+  }
+
+  .retro-hero .recent-champion-row {
+    grid-template-columns: 40px minmax(0, 1fr) !important;
+    gap: 14px !important;
+  }
+
+  .retro-hero .recent-champion-time {
+    grid-column: 2 !important;
+    justify-self: start !important;
+  }
+
+  .retro-hero .recent-champion-copy span {
+    white-space: normal !important;
+  }
+}

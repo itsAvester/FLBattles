@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
@@ -16,6 +16,7 @@ type ProfileRow = {
   soundcloud_url: string | null;
   youtube_url: string | null;
 };
+
 type SampleCounts = {
   pending: number;
   approved: number;
@@ -40,11 +41,11 @@ export default function ProfilePage() {
   const [rankTier, setRankTier] = useState<RankTier>("Unranked");
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [sampleCounts, setSampleCounts] = useState<SampleCounts>({
-  pending: 0,
-  approved: 0,
-  rejected: 0,
-  total: 0,
-});
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    total: 0,
+  });
 
   const normalizeUrl = (value: string) => {
     const trimmed = value.trim();
@@ -106,34 +107,40 @@ export default function ProfilePage() {
       }
 
       const { data: sampleRows, error: sampleError } = await supabase
-  .from("sample_submissions")
-  .select("status")
-  .eq("user_id", user.id);
+        .from("sample_submissions")
+        .select("status")
+        .eq("user_id", user.id);
 
-if (!sampleError && sampleRows) {
-  const pending = sampleRows.filter((row) => row.status === "pending").length;
-  const approved = sampleRows.filter((row) => row.status === "approved").length;
-  const rejected = sampleRows.filter((row) => row.status === "rejected").length;
+      if (!sampleError && sampleRows) {
+        const pending = sampleRows.filter(
+          (row) => row.status === "pending"
+        ).length;
+        const approved = sampleRows.filter(
+          (row) => row.status === "approved"
+        ).length;
+        const rejected = sampleRows.filter(
+          (row) => row.status === "rejected"
+        ).length;
 
-  setSampleCounts({
-    pending,
-    approved,
-    rejected,
-    total: sampleRows.length,
-  });
-} else if (sampleError) {
-  console.error("Failed to load sample submissions:", sampleError);
-}
+        setSampleCounts({
+          pending,
+          approved,
+          rejected,
+          total: sampleRows.length,
+        });
+      } else if (sampleError) {
+        console.error("Failed to load sample submissions:", sampleError);
+      }
 
-setGlobalRank(rank);
-setRankTier(computeRankTier(profileRow.rating, rank));
-setLoading(false);
+      setGlobalRank(rank);
+      setRankTier(computeRankTier(profileRow.rating, rank));
+      setLoading(false);
     };
 
     loadProfile();
   }, [router]);
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!profile) return;
@@ -181,77 +188,26 @@ setLoading(false);
     w == null ? "N/A" : `${w.toFixed(1)}%`;
 
   const formatRating = (r: number | null) =>
-    r == null ? "Unranked (0)" : `${Math.round(r)}`;
+    r == null ? "Unranked" : `${Math.round(r)}`;
 
   const formatRankPosition = (pos: number | null) =>
     pos == null ? "N/A" : `#${pos}`;
 
-  const pageFont =
-    "var(--font-manrope), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    marginTop: 6,
-    padding: "11px 12px",
-    borderRadius: 0,
-    border: "1px solid var(--line-bright)",
-    background: "rgba(5, 5, 5, 0.85)",
-    color: "var(--text)",
-    fontFamily: pageFont,
-    fontSize: "0.95rem",
-    outline: "none",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: "block",
-    color: "var(--text)",
-    fontSize: "0.85rem",
-    fontWeight: 700,
-  };
-
-  const labelTextStyle: React.CSSProperties = {
-    display: "inline-block",
-    color: "var(--muted)",
-    fontSize: "0.72rem",
-    fontWeight: 900,
-    textTransform: "uppercase",
-    letterSpacing: "0.12em",
-  };
-
-  const dividerStyle: React.CSSProperties = {
-    marginTop: 12,
-    paddingTop: 16,
-    borderTop: "1px solid var(--line)",
-  };
+  const producerName =
+    displayName.trim() ||
+    profile?.display_name ||
+    userEmail?.split("@")[0] ||
+    "Producer";
 
   if (loading) {
     return (
-      <section
-        className="page-inner"
-        style={{
-          paddingTop: 72,
-          paddingBottom: 72,
-          fontFamily: pageFont,
-        }}
-      >
+      <section className="page-inner profile-page-shell">
         <div className="eyebrow">
           <span className="eyebrow-dot" />
           Profile terminal
         </div>
 
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: pageFont,
-            fontSize: "clamp(3rem, 7vw, 6rem)",
-            lineHeight: 0.9,
-            letterSpacing: "-0.075em",
-            fontWeight: 800,
-            color: "var(--text)",
-          }}
-        >
-          Loading Profile
-        </h1>
+        <h1 className="profile-page-title">Loading Profile</h1>
 
         <div className="queue-status">
           <span className="spinner" />
@@ -263,41 +219,15 @@ setLoading(false);
 
   if (!profile) {
     return (
-      <section
-        className="page-inner"
-        style={{
-          paddingTop: 72,
-          paddingBottom: 72,
-          fontFamily: pageFont,
-        }}
-      >
+      <section className="page-inner profile-page-shell">
         <div className="eyebrow">
           <span className="eyebrow-dot" />
           Profile terminal
         </div>
 
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: pageFont,
-            fontSize: "clamp(3rem, 7vw, 6rem)",
-            lineHeight: 0.9,
-            letterSpacing: "-0.075em",
-            fontWeight: 800,
-            color: "var(--text)",
-          }}
-        >
-          No Profile Found
-        </h1>
+        <h1 className="profile-page-title">No Profile Found</h1>
 
-        <p
-          style={{
-            maxWidth: 620,
-            marginTop: 20,
-            color: "var(--muted)",
-            lineHeight: 1.7,
-          }}
-        >
+        <p className="profile-page-description">
           Try logging out and back in. If this keeps happening, your profile row
           may need to be recreated in Supabase.
         </p>
@@ -305,622 +235,239 @@ setLoading(false);
     );
   }
 
+  const topStats = [
+    {
+      label: "Rating",
+      value: formatRating(profile.rating),
+      subtext: rankTier,
+    },
+    {
+      label: "Global Rank",
+      value: formatRankPosition(globalRank),
+      subtext: "Ranked ladder",
+    },
+    {
+      label: "Win Rate",
+      value: formatWinRate(profile.win_rate),
+      subtext: `${profile.total_battles ?? 0} battles`,
+    },
+    {
+      label: "Samples",
+      value: sampleCounts.total,
+      subtext: `${sampleCounts.approved} approved`,
+    },
+  ];
+
+  const competitiveRows = [
+    ["Tier", rankTier],
+    ["Rating", formatRating(profile.rating)],
+    ["Global Position", formatRankPosition(globalRank)],
+    ["Battles Played", profile.total_battles ?? 0],
+    ["Win Rate", formatWinRate(profile.win_rate)],
+  ];
+
+  const sampleStats = [
+    ["Pending", sampleCounts.pending],
+    ["Approved", sampleCounts.approved],
+    ["Rejected", sampleCounts.rejected],
+  ];
+
   return (
-    <section
-      className="page-inner"
-      style={{
-        paddingTop: 72,
-        paddingBottom: 96,
-        fontFamily: pageFont,
-      }}
-    >
-      <div className="eyebrow">
-        <span className="eyebrow-dot" />
-        Player profile · account hub
-      </div>
-
-      <h1
-        style={{
-          margin: 0,
-          fontFamily: pageFont,
-          fontSize: "clamp(3.8rem, 8vw, 7.4rem)",
-          lineHeight: 0.86,
-          letterSpacing: "-0.075em",
-          fontWeight: 800,
-          color: "var(--text)",
-        }}
-      >
-        Your
-        <br />
-        Profile
-      </h1>
-
-      <p
-        className="page-description"
-        style={{
-          maxWidth: 680,
-          marginTop: 24,
-          color: "var(--muted)",
-          fontSize: "1rem",
-          lineHeight: 1.75,
-        }}
-      >
-        Manage your account, music links, battle stats, rating, and rank.
-      </p>
-
-      {errorMsg && (
-        <p
-          style={{
-            marginTop: 18,
-            marginBottom: 18,
-            maxWidth: 680,
-            color: "#ffd4ca",
-            border: "1px solid rgba(255, 77, 28, 0.45)",
-            background: "rgba(255, 77, 28, 0.075)",
-            fontSize: "0.9rem",
-            fontWeight: 700,
-            lineHeight: 1.45,
-            padding: "10px 12px",
-          }}
-        >
-          {errorMsg}
-        </p>
-      )}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.12fr) minmax(320px, 0.88fr)",
-          gap: 18,
-          marginTop: 34,
-          alignItems: "start",
-        }}
-      >
-        {/* Account Info */}
-        <div
-          className="card"
-          style={{
-            padding: 26,
-            overflow: "hidden",
-          }}
-        >
-          <span className="card-number">01</span>
-
-          <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 14,
-              marginBottom: 18,
-            }}
-          >
-            <p className="panel-label" style={{ margin: 0 }}>
-              Account info
-            </p>
-
-            <span className="sample-badge">Editable</span>
+    <section className="page-inner profile-page-shell">
+      <div className="profile-hero-compact">
+        <div>
+          <div className="eyebrow">
+            <span className="eyebrow-dot" />
+            Player profile · account hub
           </div>
 
-          <h2
-            style={{
-              position: "relative",
-              zIndex: 1,
-              margin: "0 0 18px",
-              fontFamily: pageFont,
-              fontSize: "clamp(2rem, 3.4vw, 3.2rem)",
-              fontWeight: 800,
-              lineHeight: 0.95,
-              letterSpacing: "-0.07em",
-              color: "var(--text)",
-            }}
-          >
-            Edit Profile
-          </h2>
+          <h1 className="profile-page-title">Profile</h1>
+
+          <p className="profile-page-description">
+            {producerName} · {rankTier} · {formatRankPosition(globalRank)}{" "}
+            Global · {formatRating(profile.rating)} Rating
+          </p>
+        </div>
+
+        <div className="profile-hero-actions">
+          <Link href="/leaderboard" className="btn-secondary">
+            View Ladder
+          </Link>
+
+          <Link href="/battles" className="btn-primary">
+            Battle Now
+          </Link>
+        </div>
+      </div>
+
+      {errorMsg && <p className="profile-error-message">{errorMsg}</p>}
+
+      <div className="profile-top-stat-grid">
+        {topStats.map((stat) => (
+          <div className="profile-top-stat-card" key={stat.label}>
+            <span>{stat.label}</span>
+            <strong>{stat.value}</strong>
+            <small>{stat.subtext}</small>
+          </div>
+        ))}
+      </div>
+
+      <div className="profile-main-grid">
+        <div className="card profile-card profile-competitive-card">
+          <div className="profile-card-header">
+            <p className="panel-label">Competitive profile</p>
+            <span className="sample-badge">Live</span>
+          </div>
+
+          <h2>Rank & battle stats</h2>
+
+          <p className="profile-card-copy">
+            Track your current ladder position, rating, battle history, and win
+            rate from ranked sample-flip battles.
+          </p>
+
+          <div className="profile-data-list">
+            {competitiveRows.map(([label, value]) => (
+              <div className="profile-data-row" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card profile-card profile-samples-card">
+          <div className="profile-card-header">
+            <p className="panel-label">Your contributions</p>
+            <span className="sample-badge">Samples</span>
+          </div>
+
+          <h2>Submitted samples</h2>
+
+          <p className="profile-card-copy">
+            Track the samples you have submitted for future FL Battles.
+          </p>
+
+          <div className="profile-sample-stat-grid">
+            {sampleStats.map(([label, value]) => (
+              <div className="profile-sample-stat" key={label}>
+                <strong>{value}</strong>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="profile-total-submitted-row">
+            <div>
+              <span>Total submitted</span>
+              <strong>{sampleCounts.total}</strong>
+            </div>
+
+            <Link href="/samples/submit" className="btn-secondary">
+              Submit New
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="card profile-card profile-edit-card">
+        <div className="profile-card-header">
+          <p className="panel-label">Account info</p>
+          <span className="sample-badge">Editable</span>
+        </div>
+
+        <div className="profile-edit-head">
+          <div>
+            <h2>Edit profile</h2>
+
+            <p className="profile-card-copy">
+              Update your producer name and music links shown around your FL
+              Battles account.
+            </p>
+          </div>
 
           {userEmail && (
-            <p
-              style={{
-                position: "relative",
-                zIndex: 1,
-                marginBottom: 18,
-                color: "var(--muted)",
-                lineHeight: 1.6,
-              }}
-            >
-              <span style={{ color: "var(--muted-2)" }}>Email:</span>{" "}
-              <strong style={{ color: "var(--text)" }}>{userEmail}</strong>
-            </p>
+            <div className="profile-email-pill">
+              <span>Email</span>
+              <strong>{userEmail}</strong>
+            </div>
           )}
+        </div>
 
-          <form
-            onSubmit={handleSaveProfile}
-            style={{
-              position: "relative",
-              zIndex: 1,
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-            }}
-          >
-            <label style={labelStyle}>
-              <span style={labelTextStyle}>Display Name</span>
+        <form onSubmit={handleSaveProfile} className="profile-form">
+          <div className="profile-form-grid">
+            <label className="profile-field">
+              <span>Display Name</span>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                style={inputStyle}
                 maxLength={32}
                 placeholder="Your producer name"
               />
             </label>
 
-            <div style={dividerStyle}>
-              <p className="panel-label" style={{ margin: 0 }}>
-                Music links
-              </p>
-            </div>
-
-            <label style={labelStyle}>
-              <span style={labelTextStyle}>Spotify URL</span>
+            <label className="profile-field">
+              <span>Spotify URL</span>
               <input
                 type="url"
                 placeholder="https://open.spotify.com/artist/..."
                 value={spotifyUrl}
                 onChange={(e) => setSpotifyUrl(e.target.value)}
-                style={inputStyle}
               />
             </label>
 
-            <label style={labelStyle}>
-              <span style={labelTextStyle}>SoundCloud URL</span>
+            <label className="profile-field">
+              <span>SoundCloud URL</span>
               <input
                 type="url"
                 placeholder="https://soundcloud.com/yourname"
                 value={soundcloudUrl}
                 onChange={(e) => setSoundcloudUrl(e.target.value)}
-                style={inputStyle}
               />
             </label>
 
-            <label style={labelStyle}>
-              <span style={labelTextStyle}>YouTube URL</span>
+            <label className="profile-field">
+              <span>YouTube URL</span>
               <input
                 type="url"
                 placeholder="https://www.youtube.com/@yourchannel"
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
-                style={inputStyle}
               />
             </label>
+          </div>
 
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={saving}
-              style={{
-                alignSelf: "flex-start",
-                marginTop: 8,
-              }}
-            >
+          <div className="profile-form-footer">
+            <button type="submit" className="btn-primary" disabled={saving}>
               {saving ? "Saving..." : "Save Profile"}
             </button>
-          </form>
-        </div>
 
-        {/* Right Side */}
-        <div
-          style={{
-            display: "grid",
-            gap: 18,
-          }}
-        >
-          {/* Rank Summary */}
-          <div
-            className="card"
-            style={{
-              padding: 26,
-              overflow: "hidden",
-            }}
-          >
-            <span className="card-number">02</span>
-
-            <div
-              style={{
-                position: "relative",
-                zIndex: 1,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 14,
-                marginBottom: 18,
-              }}
-            >
-              <p className="panel-label" style={{ margin: 0 }}>
-                Rank summary
-              </p>
-
-              <span className="sample-badge">Live</span>
-            </div>
-
-            <h2
-              style={{
-                position: "relative",
-                zIndex: 1,
-                margin: "0 0 18px",
-                fontFamily: pageFont,
-                fontSize: "clamp(2rem, 3.4vw, 3rem)",
-                fontWeight: 800,
-                lineHeight: 0.95,
-                letterSpacing: "-0.07em",
-                color: "var(--text)",
-              }}
-            >
-              Rank
-            </h2>
-
-            <div
-              style={{
-                position: "relative",
-                zIndex: 1,
-                display: "grid",
-                borderTop: "1px solid var(--line)",
-              }}
-            >
-              {[
-                ["Tier", rankTier],
-                ["Rating", formatRating(profile.rating)],
-                ["Global Position", formatRankPosition(globalRank)],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    padding: "14px 0",
-                    borderBottom: "1px solid var(--line)",
-                  }}
-                >
-                  <span
-                    style={{
-                      color: "var(--muted)",
-                      fontSize: "0.78rem",
-                      fontWeight: 900,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                    }}
-                  >
-                    {label}
-                  </span>
-
-                  <strong
-                    style={{
-                      color: "var(--text)",
-                      fontSize: "1rem",
-                    }}
-                  >
-                    {value}
-                  </strong>
-                </div>
-              ))}
-            </div>
-          </div>
-{/* Your Contributions */}
-<div
-  className="card"
-  style={{
-    padding: 26,
-    overflow: "hidden",
-  }}
->
-  <span className="card-number">03</span>
-
-  <div
-    style={{
-      position: "relative",
-      zIndex: 1,
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 14,
-      marginBottom: 18,
-    }}
-  >
-    <p className="panel-label" style={{ margin: 0 }}>
-      Your contributions
-    </p>
-
-    <span className="sample-badge">Samples</span>
-  </div>
-
-  <h2
-    style={{
-      position: "relative",
-      zIndex: 1,
-      margin: "0 0 14px",
-      fontFamily: pageFont,
-      fontSize: "clamp(2rem, 3.4vw, 3rem)",
-      fontWeight: 800,
-      lineHeight: 0.95,
-      letterSpacing: "-0.07em",
-      color: "var(--text)",
-    }}
-  >
-    Submitted Samples
-  </h2>
-
-  <p
-    style={{
-      position: "relative",
-      zIndex: 1,
-      margin: "0 0 18px",
-      color: "var(--muted)",
-      lineHeight: 1.65,
-    }}
-  >
-    Track the samples you have submitted for future FL Battles.
-  </p>
-
-  <div
-    style={{
-      position: "relative",
-      zIndex: 1,
-      display: "grid",
-      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-      gap: 10,
-      marginBottom: 18,
-    }}
-  >
-    {[
-      ["Pending", sampleCounts.pending],
-      ["Approved", sampleCounts.approved],
-      ["Rejected", sampleCounts.rejected],
-    ].map(([label, value]) => (
-      <div
-        key={label}
-        style={{
-          border: "1px solid var(--line)",
-          background: "rgba(255, 255, 255, 0.025)",
-          padding: "14px 12px",
-        }}
-      >
-        <strong
-          style={{
-            display: "block",
-            color: "var(--text)",
-            fontSize: "1.5rem",
-            lineHeight: 1,
-          }}
-        >
-          {value}
-        </strong>
-
-        <span
-          style={{
-            display: "block",
-            marginTop: 8,
-            color: "var(--muted)",
-            fontSize: "0.64rem",
-            fontWeight: 900,
-            textTransform: "uppercase",
-            letterSpacing: "0.12em",
-          }}
-        >
-          {label}
-        </span>
-      </div>
-    ))}
-  </div>
-
-  <div
-    style={{
-      position: "relative",
-      zIndex: 1,
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      gap: 14,
-      borderTop: "1px solid var(--line)",
-      paddingTop: 16,
-    }}
-  >
-    <div>
-      <p
-        style={{
-          margin: 0,
-          color: "var(--muted)",
-          fontSize: "0.72rem",
-          fontWeight: 900,
-          textTransform: "uppercase",
-          letterSpacing: "0.12em",
-        }}
-      >
-        Total submitted
-      </p>
-
-      <strong
-        style={{
-          display: "block",
-          marginTop: 4,
-          color: "var(--text)",
-          fontSize: "1rem",
-        }}
-      >
-        {sampleCounts.total}
-      </strong>
-    </div>
-
-    <Link href="/samples/submit" className="btn-secondary">
-      Submit New
-    </Link>
-  </div>
-</div>
-          {/* Stats */}
-          <div
-            className="card"
-            style={{
-              padding: 26,
-              overflow: "hidden",
-            }}
-          >
-            <span className="card-number">04</span>
-
-            <div
-              style={{
-                position: "relative",
-                zIndex: 1,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 14,
-                marginBottom: 18,
-              }}
-            >
-              <p className="panel-label" style={{ margin: 0 }}>
-                Battle stats
-              </p>
-
-              <span className="sample-badge">Tracked</span>
-            </div>
-
-            <h2
-              style={{
-                position: "relative",
-                zIndex: 1,
-                margin: "0 0 18px",
-                fontFamily: pageFont,
-                fontSize: "clamp(2rem, 3.4vw, 3rem)",
-                fontWeight: 800,
-                lineHeight: 0.95,
-                letterSpacing: "-0.07em",
-                color: "var(--text)",
-              }}
-            >
-              Stats
-            </h2>
-
-            <div
-              style={{
-                position: "relative",
-                zIndex: 1,
-                display: "grid",
-                borderTop: "1px solid var(--line)",
-              }}
-            >
-              {[
-                ["Battles Played", profile.total_battles ?? 0],
-                ["Win Rate", formatWinRate(profile.win_rate)],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 16,
-                    padding: "14px 0",
-                    borderBottom: "1px solid var(--line)",
-                  }}
-                >
-                  <span
-                    style={{
-                      color: "var(--muted)",
-                      fontSize: "0.78rem",
-                      fontWeight: 900,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                    }}
-                  >
-                    {label}
-                  </span>
-
-                  <strong
-                    style={{
-                      color: "var(--text)",
-                      fontSize: "1rem",
-                    }}
-                  >
-                    {value}
-                  </strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Account Security */}
-          <div
-            className="card"
-            style={{
-              padding: 26,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "relative",
-                zIndex: 1,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 14,
-                marginBottom: 18,
-              }}
-            >
-              <p className="panel-label" style={{ margin: 0 }}>
-                Account security
-              </p>
-
-              <span
-                style={{
-                  padding: "8px 10px",
-                  color: "var(--orange)",
-                  border: "1px solid rgba(255, 77, 28, 0.45)",
-                  background: "rgba(255, 77, 28, 0.075)",
-                  fontSize: "0.64rem",
-                  fontWeight: 900,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.12em",
-                }}
-              >
-                Password
-              </span>
-            </div>
-
-            <h2
-              style={{
-                position: "relative",
-                zIndex: 1,
-                margin: "0 0 14px",
-                fontFamily: pageFont,
-                fontSize: "clamp(2rem, 3.4vw, 3rem)",
-                fontWeight: 800,
-                lineHeight: 0.95,
-                letterSpacing: "-0.07em",
-                color: "var(--text)",
-              }}
-            >
-              Secure Access
-            </h2>
-
-            <p
-              style={{
-                position: "relative",
-                zIndex: 1,
-                margin: "0 0 18px",
-                color: "var(--muted)",
-                lineHeight: 1.65,
-              }}
-            >
-              Update your password to keep your FL Battles account secure.
+            <p>
+              Links are normalized automatically, so you can paste them with or
+              without <code>https://</code>.
             </p>
-
-            <Link href="/change-password" className="btn-secondary">
-              Change Password
-            </Link>
           </div>
+        </form>
+      </div>
+
+      <div className="card profile-card profile-security-card">
+        <div>
+          <div className="profile-card-header">
+            <p className="panel-label">Account security</p>
+            <span className="profile-danger-badge">Password</span>
+          </div>
+
+          <h2>Secure access</h2>
+
+          <p className="profile-card-copy">
+            Update your password to keep your FL Battles account secure.
+          </p>
         </div>
+
+        <Link href="/change-password" className="btn-secondary">
+          Change Password
+        </Link>
       </div>
     </section>
   );

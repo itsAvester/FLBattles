@@ -9,32 +9,51 @@ export default function HomePage() {
           <div className="hero-copy">
             <div className="eyebrow">
               <span className="eyebrow-dot" />
-              Ranked beat battles · real-time matchmaking
+              Ranked sample flip battles · real-time matchmaking
             </div>
 
             <h1>
-              15 Minute
+              Live Sample
               <br />
-              Beat Battles
+              Flip Battles
             </h1>
 
             <p className="hero-description">
-              Queue into a live lobby, flip the same sample as everyone else,
-              upload your best idea, and climb the ranked ladder through votes.
+              Battle producers in real time using the exact same sample. Upload
+              your best flip, earn votes, and climb the ranked producer ladder.
             </p>
 
             <div className="hero-actions">
               <a href="/battles" className="btn-primary">
                 Enter Ranked Queue
               </a>
-              <a href="/profile" className="btn-secondary">
-                View Profile
+              <a href="/leaderboard" className="btn-secondary">
+                View Leaderboard
               </a>
             </div>
 
+            <div className="hero-stats">
+              <div>
+                <strong>1458+</strong>
+                <span>Producers</span>
+              </div>
+              <div>
+                <strong>23k+</strong>
+                <span>Page Views</span>
+              </div>
+              <div>
+                <strong>Top 10</strong>
+                <span>Ranked Ladder</span>
+              </div>
+              <div>
+                <strong>Live</strong>
+                <span>Every Day</span>
+              </div>
+            </div>
+
             <p className="mini-note">
-              Built for fast reps, unfinished ideas, and producers who want to
-              improve under pressure.
+              Join 1458+ registered producers competing in live ranked
+              sample-flip battles.
             </p>
           </div>
 
@@ -45,22 +64,22 @@ export default function HomePage() {
                 <span />
                 <span />
               </div>
-              <span className="window-title">FLBATTLE.COM</span>
-              <span className="window-status">LIVE</span>
+              <span className="window-title">1458+ PRODUCERS REGISTERED</span>
+              <span className="window-status">RANKED</span>
             </div>
 
             <div className="stats-grid">
               <div className="stat-box">
-                <strong>15:00</strong>
-                <span>Round timer</span>
+                <strong>15</strong>
+                <span>Minutes To Create</span>
               </div>
               <div className="stat-box">
                 <strong>7</strong>
-                <span>Max players</span>
+                <span>Producers Per Lobby</span>
               </div>
               <div className="stat-box">
-                <strong>600+</strong>
-                <span>Champion rating</span>
+                <strong>1458+</strong>
+                <span>Registered Producers</span>
               </div>
             </div>
 
@@ -130,7 +149,9 @@ export default function HomePage() {
             <span className="eyebrow-dot" />
             How it works
           </div>
-          <h2>Jump in like a game lobby. Leave with a beat idea.</h2>
+
+          <h2>Everyone gets the same sample. The best flip wins.</h2>
+
           <p>
             FL Battles is designed to feel quick, competitive, and repeatable.
             No month-long contests. No complicated rules. Just short rounds and
@@ -152,8 +173,8 @@ export default function HomePage() {
             <span className="card-number">02</span>
             <h3>Flip the sample</h3>
             <p>
-              Everyone receives the same sample and ten minutes to make the best
-              possible idea.
+              Everyone receives the same sample and 15 minutes to make the best
+              possible flip.
             </p>
           </div>
 
@@ -179,7 +200,7 @@ export default function HomePage() {
           <h2>Built for producers who want reps, not perfection.</h2>
 
           <p>
-            The goal is simple: finish more ideas. Ten-minute pressure forces
+            The goal is simple: finish more ideas. Short-time pressure forces
             you to commit, experiment, and practice faster.
           </p>
 
@@ -236,7 +257,7 @@ export default function HomePage() {
             Ready to battle?
           </div>
 
-          <h2>Start your first 15-minute round.</h2>
+          <h2>Join the next live sample-flip battle.</h2>
 
           <p>
             Log in, hit queue, and see what you can make from a random sample.

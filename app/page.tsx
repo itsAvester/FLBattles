@@ -32,18 +32,18 @@ export default function HomePage() {
               </a>
             </div>
 
-           <div className="hero-stats">
+           <div className="hero-stats hero-stats-three">
   <div className="hero-stat-item">
     <div className="hero-stat-icon">♙</div>
     <strong>
-  <RegisteredProducerCount suffix="+" />
-</strong>
+      <RegisteredProducerCount suffix="+" />
+    </strong>
     <span>Producers</span>
   </div>
 
   <div className="hero-stat-item">
     <div className="hero-stat-icon">◉</div>
-    <strong>23k+</strong>
+    <strong>23K+</strong>
     <span>Page Views</span>
   </div>
 
@@ -51,12 +51,6 @@ export default function HomePage() {
     <div className="hero-stat-icon">♕</div>
     <strong>Top 10</strong>
     <span>Ranked Ladder</span>
-  </div>
-
-  <div className="hero-stat-item">
-    <div className="hero-stat-icon">⚡</div>
-    <strong>Live</strong>
-    <span>Every Day</span>
   </div>
 </div>
 

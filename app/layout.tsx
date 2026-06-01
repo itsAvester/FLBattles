@@ -23,7 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <NavBar />
         <div className="beta-banner">
   <span className="beta-pill">BETA</span>
-  <span>Fixed issues with queue and submitting beats!</span>
+  <span>1500+ Producers Already Playing</span>
 </div>
         <main className="page">{children}</main>
         <Analytics />

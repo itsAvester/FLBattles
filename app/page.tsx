@@ -32,24 +32,31 @@ export default function HomePage() {
               </a>
             </div>
 
-            <div className="hero-stats">
-              <div>
-                <strong>1458+</strong>
-                <span>Producers</span>
-              </div>
-              <div>
-                <strong>23k+</strong>
-                <span>Page Views</span>
-              </div>
-              <div>
-                <strong>Top 10</strong>
-                <span>Ranked Ladder</span>
-              </div>
-              <div>
-                <strong>Live</strong>
-                <span>Every Day</span>
-              </div>
-            </div>
+           <div className="hero-stats">
+  <div className="hero-stat-item">
+    <div className="hero-stat-icon">♙</div>
+    <strong>1458+</strong>
+    <span>Producers</span>
+  </div>
+
+  <div className="hero-stat-item">
+    <div className="hero-stat-icon">◉</div>
+    <strong>23k+</strong>
+    <span>Page Views</span>
+  </div>
+
+  <div className="hero-stat-item">
+    <div className="hero-stat-icon">♕</div>
+    <strong>Top 10</strong>
+    <span>Ranked Ladder</span>
+  </div>
+
+  <div className="hero-stat-item">
+    <div className="hero-stat-icon">⚡</div>
+    <strong>Live</strong>
+    <span>Every Day</span>
+  </div>
+</div>
 
             <p className="mini-note">
               Join 1458+ registered producers competing in live ranked

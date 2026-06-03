@@ -186,10 +186,12 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
   const mode = searchParams.get("mode") ?? "ranked";
   const isRanked = mode !== "custom";
+const activeBattleIdRef = useRef<string>(battleId);
 const playedStartSoundFor = useRef<string | null>(null);
 const votingSectionRef = useRef<HTMLDivElement | null>(null);
 const previousPlayerIdsRef = useRef<Set<string>>(new Set());
 const playersLoadedOnceRef = useRef(false);
+const lastLoadedPlayerProfileKeyRef = useRef<string>("");
 const minPlayersSoundPlayedRef = useRef(false);
 const finalCountdownPlayedForRef = useRef<Set<number>>(new Set());
 const warningTimerLastValueRef = useRef<number | null>(null);
@@ -383,6 +385,7 @@ const submittedUsersLoadedRef = useRef(false);
   // Reset all per-lobby client state whenever the URL changes to a different lobby.
   // This prevents a finished lobby's timer/phase/upload state from carrying into a new lobby.
   useEffect(() => {
+    activeBattleIdRef.current = battleId;
     setLobby(null);
     setPlayers([]);
     setMatchStarted(false);
@@ -416,6 +419,7 @@ const submittedUsersLoadedRef = useRef(false);
     setLeaveError(null);
     previousPlayerIdsRef.current = new Set();
     playersLoadedOnceRef.current = false;
+    lastLoadedPlayerProfileKeyRef.current = "";
     minPlayersSoundPlayedRef.current = false;
     finalCountdownPlayedForRef.current = new Set();
     warningTimerLastValueRef.current = null;
@@ -463,21 +467,61 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
 
   setPlayerProfilesById(profileMap);
 };
-  useEffect(() => {
-    const fetchLobby = async () => {
+  const applyLobbyState = (lobbyRow: Lobby) => {
+    setLobby(lobbyRow);
+
+    if (lobbyRow.status === "in_progress" && lobbyRow.battle_started_at) {
+      setMatchStarted(true);
+      setPhase("countdown");
+    } else if (lobbyRow.status === "voting") {
+      setMatchStarted(true);
+      setPhase("results");
+    } else if (lobbyRow.status === "finished") {
+      setMatchStarted(true);
+      setPhase("results");
+      setAllVotesIn(true);
+      router.push(`/battles/${battleId}/results`);
+    } else {
+      setMatchStarted(false);
+      setPhase("countdown");
+      setTimeLeft(INITIAL_TIME);
+    }
+  };
+
+  const refreshLobbyState = async (options?: { showLoading?: boolean }) => {
+    if (!battleId) return;
+
+    const showLoading = options?.showLoading ?? false;
+
+    if (showLoading) {
       setLobbyLoading(true);
       setLobbyError(null);
+    }
 
-      const { data: lobbyData, error: lobbyErr } = await supabase
-        .from("battle_lobbies")
-        .select("*")
-        .eq("id", battleId)
-        .single();
+    try {
+      const [authResult, lobbyResult, playersResult, submissionsResult] =
+        await Promise.all([
+          supabase.auth.getUser(),
+          supabase.from("battle_lobbies").select("*").eq("id", battleId).single(),
+          supabase
+            .from("battle_lobby_players")
+            .select("*")
+            .eq("lobby_id", battleId)
+            .is("left_at", null)
+            .order("joined_at", { ascending: true }),
+          supabase
+            .from("battle_submissions")
+            .select("user_id")
+            .eq("battle_id", battleId),
+        ]);
+
+      if (activeBattleIdRef.current !== battleId) return;
+
+      const { data: lobbyData, error: lobbyErr } = lobbyResult;
 
       if (lobbyErr || !lobbyData) {
-        console.error("Failed to load lobby:", lobbyErr);
+        console.error("Failed to refresh lobby:", lobbyErr);
         setLobbyError("Failed to load lobby.");
-        setLobbyLoading(false);
         return;
       }
 
@@ -505,134 +549,136 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
         }
       }
 
-      setLobby(lobbyRow);
+      applyLobbyState(lobbyRow);
 
-      if (lobbyRow.status === "in_progress" && lobbyRow.battle_started_at) {
-  setMatchStarted(true);
-  setPhase("countdown");
-} else if (lobbyRow.status === "voting") {
-  setMatchStarted(true);
-  setPhase("results");
-} else if (lobbyRow.status === "finished") {
-  setMatchStarted(true);
-  setPhase("results");
-  setAllVotesIn(true);
-  router.push(`/battles/${battleId}/results`);
-} else {
-  setMatchStarted(false);
-  setPhase("countdown");
-  setTimeLeft(INITIAL_TIME);
-}
+      const { data: playersData, error: playersErr } = playersResult;
 
-      const { data: playersData, error: playersErr } = await supabase
-  .from("battle_lobby_players")
-  .select("*")
-  .eq("lobby_id", battleId)
-  .is("left_at", null)
-  .order("joined_at", { ascending: true });
+      if (playersErr) {
+        console.error("Failed to refresh lobby players:", playersErr);
+      } else if (playersData) {
+        const playerRows = playersData as LobbyPlayer[];
+        setPlayers(playerRows);
 
-      if (!playersErr && playersData) {
-  const playerRows = playersData as LobbyPlayer[];
-  setPlayers(playerRows);
-  await loadPlayerNames(playerRows);
-}
+        const playerProfileKey = playerRows.map((player) => player.user_id).join("|");
+        if (playerProfileKey !== lastLoadedPlayerProfileKeyRef.current) {
+          lastLoadedPlayerProfileKeyRef.current = playerProfileKey;
+          await loadPlayerNames(playerRows);
+        }
+      }
 
-      setLobbyLoading(false);
+      const { data: submissionRows, error: submissionsErr } = submissionsResult;
+
+      if (submissionsErr) {
+        console.error("Failed to refresh submitted users:", submissionsErr);
+      } else {
+        const ids = new Set((submissionRows ?? []).map((row: any) => row.user_id));
+        setSubmittedUserIds(ids);
+        submittedUsersLoadedRef.current = true;
+
+        const currentUserId = authResult.data.user?.id ?? null;
+        setUploadDone(currentUserId ? ids.has(currentUserId) : false);
+
+        if (currentUserId) {
+          const { data: voteRows, error: voteErr } = await supabase
+            .from("battle_votes")
+            .select("submission_user_id")
+            .eq("battle_id", battleId)
+            .eq("voter_id", currentUserId)
+            .limit(1);
+
+          if (voteErr) {
+            console.error("Failed to refresh vote state:", voteErr);
+          } else {
+            setVotedForUserId(voteRows?.[0]?.submission_user_id ?? null);
+          }
+        } else {
+          setVotedForUserId(null);
+        }
+      }
+    } finally {
+      if (showLoading) {
+        setLobbyLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    refreshLobbyState({ showLoading: true });
+  }, [battleId]);
+
+  // Realtime is still used for fast updates, but every realtime event now triggers
+  // a full database refresh so missed fields and stale local state self-correct.
+  useEffect(() => {
+    if (!battleId) return;
+
+    const handleRealtimeRefresh = () => {
+      refreshLobbyState();
     };
 
-    fetchLobby();
-  }, [battleId, router]);
+    const handleSubmittedUser = (submittedUserId?: string) => {
+      if (!submittedUserId) {
+        refreshLobbyState();
+        return;
+      }
 
-  // Realtime subscriptions for lobby + players
-  useEffect(() => {
+      setSubmittedUserIds((prev) => {
+        const alreadySubmitted = prev.has(submittedUserId);
+        const next = new Set(prev);
+        next.add(submittedUserId);
+
+        if (!alreadySubmitted && submittedUsersLoadedRef.current) {
+          playSubmitDing();
+        }
+
+        return next;
+      });
+
+      refreshLobbyState();
+    };
+
     const lobbyChannel = supabase
       .channel(`battle_lobbies:${battleId}`)
       .on(
         "postgres_changes",
         {
-          event: "UPDATE",
+          event: "*",
           schema: "public",
           table: "battle_lobbies",
           filter: `id=eq.${battleId}`,
         },
-        (payload) => {
-          const updated = payload.new as Lobby;
-          setLobby(updated);
-
-          if (updated.status === "in_progress" && updated.battle_started_at) {
-  setMatchStarted(true);
-  setPhase("countdown");
-} else if (updated.status === "searching") {
-  setMatchStarted(false);
-  setPhase("countdown");
-  setTimeLeft(INITIAL_TIME);
-  setDebugStartTime(null);
-} else if (updated.status === "voting") {
-  setMatchStarted(true);
-  setPhase("results");
-} else if (updated.status === "finished") {
-  setMatchStarted(true);
-  setPhase("results");
-  setAllVotesIn(true);
-  router.push(`/battles/${battleId}/results`);
-}
-        }
+        handleRealtimeRefresh
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (
+          status === "SUBSCRIBED" ||
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT"
+        ) {
+          window.setTimeout(() => refreshLobbyState(), 500);
+        }
+      });
 
     const playersChannel = supabase
-  .channel(`battle_lobby_players:${battleId}`)
-  .on(
-    "postgres_changes",
-    {
-      event: "*",
-      schema: "public",
-      table: "battle_lobby_players",
-      filter: `lobby_id=eq.${battleId}`,
-    },
-    async () => {
-      const { data: playersData } = await supabase
-        .from("battle_lobby_players")
-        .select("*")
-        .eq("lobby_id", battleId)
-        .is("left_at", null)
-        .order("joined_at", { ascending: true });
-
-      if (playersData) {
-        const playerRows = playersData as LobbyPlayer[];
-        setPlayers(playerRows);
-        await loadPlayerNames(playerRows);
-      }
-    }
-  )
-  .subscribe();
-
-    return () => {
-      supabase.removeChannel(lobbyChannel);
-      supabase.removeChannel(playersChannel);
-    };
-  }, [battleId, router]);
-
-  useEffect(() => {
-    if (!battleId) return;
-
-    const loadSubmittedUsers = async () => {
-      const { data, error } = await supabase
-        .from("battle_submissions")
-        .select("user_id")
-        .eq("battle_id", battleId);
-
-      if (error) {
-        console.error("Failed to load submitted users:", error);
-        return;
-      }
-
-      const ids = new Set((data ?? []).map((row: any) => row.user_id));
-      setSubmittedUserIds(ids);
-      submittedUsersLoadedRef.current = true;
-    };
-
-    loadSubmittedUsers();
+      .channel(`battle_lobby_players:${battleId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "battle_lobby_players",
+          filter: `lobby_id=eq.${battleId}`,
+        },
+        handleRealtimeRefresh
+      )
+      .subscribe((status) => {
+        if (
+          status === "SUBSCRIBED" ||
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT"
+        ) {
+          window.setTimeout(() => refreshLobbyState(), 500);
+        }
+      });
 
     const submissionsChannel = supabase
       .channel(`battle_submissions_live:${battleId}`)
@@ -645,20 +691,7 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
           filter: `battle_id=eq.${battleId}`,
         },
         (payload) => {
-          const submittedUserId = (payload.new as { user_id?: string }).user_id;
-          if (!submittedUserId) return;
-
-          setSubmittedUserIds((prev) => {
-            const alreadySubmitted = prev.has(submittedUserId);
-            const next = new Set(prev);
-            next.add(submittedUserId);
-
-            if (!alreadySubmitted && submittedUsersLoadedRef.current) {
-              playSubmitDing();
-            }
-
-            return next;
-          });
+          handleSubmittedUser((payload.new as { user_id?: string }).user_id);
         }
       )
       .on(
@@ -670,26 +703,75 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
           filter: `battle_id=eq.${battleId}`,
         },
         (payload) => {
-          const submittedUserId = (payload.new as { user_id?: string }).user_id;
-          if (!submittedUserId) return;
-
-          setSubmittedUserIds((prev) => {
-            const alreadySubmitted = prev.has(submittedUserId);
-            const next = new Set(prev);
-            next.add(submittedUserId);
-
-            if (!alreadySubmitted && submittedUsersLoadedRef.current) {
-              playSubmitDing();
-            }
-
-            return next;
-          });
+          handleSubmittedUser((payload.new as { user_id?: string }).user_id);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (
+          status === "SUBSCRIBED" ||
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT"
+        ) {
+          window.setTimeout(() => refreshLobbyState(), 500);
+        }
+      });
+
+    const votesChannel = supabase
+      .channel(`battle_votes_live:${battleId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "battle_votes",
+          filter: `battle_id=eq.${battleId}`,
+        },
+        handleRealtimeRefresh
+      )
+      .subscribe((status) => {
+        if (
+          status === "SUBSCRIBED" ||
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT"
+        ) {
+          window.setTimeout(() => refreshLobbyState(), 500);
+        }
+      });
 
     return () => {
+      supabase.removeChannel(lobbyChannel);
+      supabase.removeChannel(playersChannel);
       supabase.removeChannel(submissionsChannel);
+      supabase.removeChannel(votesChannel);
+    };
+  }, [battleId]);
+
+  // Polling fallback: if Supabase realtime misses an update, the lobby fixes itself
+  // within a few seconds instead of forcing players to manually refresh.
+  useEffect(() => {
+    if (!battleId) return;
+
+    const interval = window.setInterval(() => {
+      refreshLobbyState();
+    }, 2500);
+
+    return () => window.clearInterval(interval);
+  }, [battleId]);
+
+  // Browser tabs can sleep in the background. Refresh immediately when users come back.
+  useEffect(() => {
+    if (!battleId) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshLobbyState();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [battleId]);
 
@@ -782,27 +864,6 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, [lobby, players]);
 
-// Automatically advance lobby phases while users are in a battle lobby.
-// This keeps lobbies moving from searching → in_progress → voting → finished.
-useEffect(() => {
-  if (!battleId) return;
-
-  const advanceLobbies = async () => {
-    const { error } = await supabase.rpc("advance_battle_lobbies");
-
-    if (error) {
-      console.error("Failed to advance battle lobbies:", error);
-    }
-  };
-
-  // Run once immediately when the lobby page loads
-  advanceLobbies();
-
-  // Then run every 10 seconds while the user is on this lobby page
-  const interval = setInterval(advanceLobbies, 3000);
-
-  return () => clearInterval(interval);
-}, [battleId]);
 // Automatically advance lobby phases while users are in a battle lobby.
 // This keeps lobbies moving from searching → in_progress → voting → finished.
 useEffect(() => {
@@ -1378,6 +1439,12 @@ if (submissions.length === 1 || count >= requiredVotes) {
       }
 
       setUploadDone(true);
+      setSubmittedUserIds((prev) => {
+        const next = new Set(prev);
+        next.add(user.id);
+        return next;
+      });
+      await refreshLobbyState();
 // Do NOT immediately switch to results.
 // Stay on this screen until the shared lobby status changes to "voting" or "finished".
     } catch (err: any) {
@@ -1438,6 +1505,7 @@ if (submissions.length === 1 || count >= requiredVotes) {
       }
 
       setVotedForUserId(submission.user_id);
+      await refreshLobbyState();
     } finally {
       setVoteSubmitting(false);
     }

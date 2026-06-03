@@ -46,6 +46,12 @@ type Lobby = {
   voting_started_at: string | null;
   voting_ends_at: string | null;
   finished_at: string | null;
+  host_user_id: string | null;
+  battle_duration_seconds: number | null;
+  sample_source: "random" | "host_upload" | null;
+  voting_style: "everyone" | "host" | null;
+  sample_name: string | null;
+  sample_url: string | null;
 };
 
 type LobbyPlayer = {
@@ -173,6 +179,12 @@ function getRankTheme(rank: string) {
 
 function formatQueueEta(seconds: number | null): string {
   if (seconds == null) return "--:--";
+  const mins = Math.floor(seconds / 60);
+  const secs = String(seconds % 60).padStart(2, "0");
+  return `${mins}:${secs}`;
+}
+
+function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = String(seconds % 60).padStart(2, "0");
   return `${mins}:${secs}`;
@@ -328,6 +340,7 @@ const [topTenUserIds, setTopTenUserIds] = useState<Set<string>>(new Set());
 const [submittedUserIds, setSubmittedUserIds] = useState<Set<string>>(new Set());
 const submittedUsersLoadedRef = useRef(false);
   const [lobbyError, setLobbyError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [matchStarted, setMatchStarted] = useState(false);
   const [autoStartEta, setAutoStartEta] = useState<number | null>(null);
   const [debugStarting, setDebugStarting] = useState(false);
@@ -377,6 +390,11 @@ const submittedUsersLoadedRef = useRef(false);
   const [allVotesIn, setAllVotesIn] = useState(false);
   
   const [votingTimeLeft, setVotingTimeLeft] = useState<number>(VOTING_TIME);
+
+  const battleDurationSeconds = lobby?.battle_duration_seconds ?? INITIAL_TIME;
+  const battleDurationDisplay = formatDuration(battleDurationSeconds);
+  const isHostVoting = lobby?.voting_style === "host";
+  const currentUserIsHost = !!currentUserId && currentUserId === lobby?.host_user_id;
 
   // leaving / penalty
   const [leaving, setLeaving] = useState(false);
@@ -484,7 +502,7 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
     } else {
       setMatchStarted(false);
       setPhase("countdown");
-      setTimeLeft(INITIAL_TIME);
+      setTimeLeft(lobbyRow.battle_duration_seconds ?? INITIAL_TIME);
     }
   };
 
@@ -516,6 +534,9 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
         ]);
 
       if (activeBattleIdRef.current !== battleId) return;
+
+      const authUserId = authResult.data.user?.id ?? null;
+      setCurrentUserId(authUserId);
 
       const { data: lobbyData, error: lobbyErr } = lobbyResult;
 
@@ -575,15 +596,14 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
         setSubmittedUserIds(ids);
         submittedUsersLoadedRef.current = true;
 
-        const currentUserId = authResult.data.user?.id ?? null;
-        setUploadDone(currentUserId ? ids.has(currentUserId) : false);
+        setUploadDone(authUserId ? ids.has(authUserId) : false);
 
-        if (currentUserId) {
+        if (authUserId) {
           const { data: voteRows, error: voteErr } = await supabase
             .from("battle_votes")
             .select("submission_user_id")
             .eq("battle_id", battleId)
-            .eq("voter_id", currentUserId)
+            .eq("voter_id", authUserId)
             .limit(1);
 
           if (voteErr) {
@@ -605,6 +625,38 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
   useEffect(() => {
     refreshLobbyState({ showLoading: true });
   }, [battleId]);
+
+
+  // If someone opens a shared custom lobby link, add them to that lobby while it is still searching.
+  useEffect(() => {
+    if (!lobby || lobby.mode !== "custom" || lobby.status !== "searching") return;
+    if (!currentUserId) return;
+    if (players.some((player) => player.user_id === currentUserId)) return;
+
+    let cancelled = false;
+
+    const joinCustomLobbyFromLink = async () => {
+      const { error } = await supabase.rpc("join_custom_battle_lobby", {
+        p_lobby_id: battleId,
+      });
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Failed to join custom lobby from link:", error);
+        setLobbyError(error.message || "Could not join this custom lobby.");
+        return;
+      }
+
+      await refreshLobbyState();
+    };
+
+    joinCustomLobbyFromLink();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [battleId, lobby?.id, lobby?.mode, lobby?.status, currentUserId, players]);
 
   // Realtime is still used for fast updates, but every realtime event now triggers
   // a full database refresh so missed fields and stale local state self-correct.
@@ -935,7 +987,7 @@ useEffect(() => {
       setDebugStartTime(nowIso);
       setMatchStarted(true);
       setPhase("countdown");
-      setTimeLeft(INITIAL_TIME);
+      setTimeLeft(battleDurationSeconds);
 
       // Locally mark lobby as in_progress so the UI shows started
       setLobby((prev) =>
@@ -957,9 +1009,9 @@ useEffect(() => {
 
   // ───────────────── SAMPLE FETCH ─────────────────
 
-  // When match has started, fetch a random sample.
-  // Depend on the start timestamp so a newly started lobby gets a fresh sample,
-  // but ordinary timer ticks do not refetch it.
+  // When match has started, load the battle sample.
+  // Custom host-uploaded samples are already saved on the lobby.
+  // Random samples still use the API, which also saves the selected random sample on the lobby.
   useEffect(() => {
     const startIso = lobby?.battle_started_at ?? debugStartTime;
     if (!matchStarted || !startIso) return;
@@ -968,6 +1020,16 @@ useEffect(() => {
       try {
         setSampleLoading(true);
         setSampleError(null);
+
+        if (lobby?.sample_name && lobby?.sample_url) {
+          setSampleName(lobby.sample_name);
+          setSampleUrl(lobby.sample_url);
+          return;
+        }
+
+        if (lobby?.sample_source === "host_upload") {
+          throw new Error("The host-uploaded sample is missing. Ask the host to recreate the lobby.");
+        }
 
         const res = await fetch(`/api/random-sample?battleId=${battleId}`);
         if (!res.ok) {
@@ -992,7 +1054,7 @@ useEffect(() => {
     };
 
     fetchSample();
-  }, [matchStarted, lobby?.battle_started_at, debugStartTime]);
+  }, [battleId, matchStarted, lobby?.battle_started_at, lobby?.sample_name, lobby?.sample_url, lobby?.sample_source, debugStartTime]);
 
   // ───────────────── UNIVERSAL / DEBUG TIMER ─────────────────
 
@@ -1007,9 +1069,9 @@ useEffect(() => {
     if (lobby?.status === "searching") {
       setMatchStarted(false);
       setPhase("countdown");
-      setTimeLeft(INITIAL_TIME);
+      setTimeLeft(battleDurationSeconds);
     }
-  }, [lobby?.status, lobby?.battle_started_at]);
+  }, [lobby?.status, lobby?.battle_started_at, battleDurationSeconds]);
 
   // Compute timeLeft from:
   // 1) lobby.battle_started_at (real universal timer), OR
@@ -1018,7 +1080,7 @@ useEffect(() => {
     const startIso = lobby?.battle_started_at ?? debugStartTime;
 
     if (!startIso) {
-      setTimeLeft(INITIAL_TIME);
+      setTimeLeft(battleDurationSeconds);
       return;
     }
 
@@ -1026,7 +1088,7 @@ useEffect(() => {
 
     // Do not run the timer from an old DB value unless the lobby is actually in progress.
     if (!debugStartTime && lobby?.status !== "in_progress") {
-      setTimeLeft(INITIAL_TIME);
+      setTimeLeft(battleDurationSeconds);
       return;
     }
 
@@ -1034,7 +1096,7 @@ useEffect(() => {
 
     const tick = () => {
       const elapsed = Math.floor((Date.now() - startMs) / 1000);
-      const remaining = INITIAL_TIME - elapsed;
+      const remaining = battleDurationSeconds - elapsed;
 
       if (remaining <= 0) {
         setTimeLeft(0);
@@ -1051,7 +1113,7 @@ useEffect(() => {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [lobby?.status, lobby?.battle_started_at, debugStartTime, phase]);
+  }, [lobby?.status, lobby?.battle_started_at, debugStartTime, phase, battleDurationSeconds]);
 
   useEffect(() => {
     if (!matchStarted || phase !== "countdown") {
@@ -1309,26 +1371,43 @@ setLoadingSubmissions(false);
         .eq("battle_id", battleId);
 
       if (!error && count != null && !cancelled) {
-        const requiredVotes = submissions.length <= 1 ? 0 : submissions.length;
+        let effectiveVoteCount = count;
+        let requiredVotes = submissions.length <= 1 ? 0 : submissions.length;
 
-if (submissions.length === 1 || count >= requiredVotes) {
-  const { error: finalizeError } = await supabase.rpc(
-    "finalize_battle_results",
-    {
-      p_battle_id: battleId,
-    }
-  );
+        if (isHostVoting) {
+          requiredVotes = submissions.length <= 1 ? 0 : 1;
 
-  if (finalizeError) {
-    console.error("Failed to finalize battle:", finalizeError);
-    setAllVotesIn(false);
-    setVoteError(finalizeError.message || "Failed to finalize battle.");
-    return;
-  }
+          const { count: hostVoteCount, error: hostVoteError } = await supabase
+            .from("battle_votes")
+            .select("id", { count: "exact", head: true })
+            .eq("battle_id", battleId)
+            .eq("voter_id", lobby?.host_user_id ?? "");
 
-  setAllVotesIn(true);
-  router.push(`/battles/${battleId}/results`);
-}
+          if (hostVoteError) {
+            console.error("Failed to check host vote count:", hostVoteError);
+          } else {
+            effectiveVoteCount = hostVoteCount ?? 0;
+          }
+        }
+
+        if (submissions.length === 1 || effectiveVoteCount >= requiredVotes) {
+          const { error: finalizeError } = await supabase.rpc(
+            "finalize_battle_results",
+            {
+              p_battle_id: battleId,
+            }
+          );
+
+          if (finalizeError) {
+            console.error("Failed to finalize battle:", finalizeError);
+            setAllVotesIn(false);
+            setVoteError(finalizeError.message || "Failed to finalize battle.");
+            return;
+          }
+
+          setAllVotesIn(true);
+          router.push(`/battles/${battleId}/results`);
+        }
       }
     };
 
@@ -1339,7 +1418,7 @@ if (submissions.length === 1 || count >= requiredVotes) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [phase, battleId, submissions.length, router]);
+  }, [phase, battleId, submissions.length, router, isHostVoting, lobby?.host_user_id]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = String(timeLeft % 60).padStart(2, "0");
@@ -1465,6 +1544,11 @@ if (submissions.length === 1 || count >= requiredVotes) {
 
     if (votedForUserId) {
       setVoteError("You already voted in this battle.");
+      return;
+    }
+
+    if (isHostVoting && !currentUserIsHost) {
+      setVoteError("This custom battle uses host voting. Only the host can choose the winner.");
       return;
     }
 
@@ -1770,14 +1854,14 @@ useEffect(() => {
               >
                 <span className="battle-lobby-stat-label">Round timer</span>
                 <strong className="battle-lobby-stat-value battle-lobby-stat-value-text">
-                  {matchStarted && phase !== "results" ? roundTimerDisplay : "15:00"}
+                  {matchStarted && phase !== "results" ? roundTimerDisplay : battleDurationDisplay}
                 </strong>
               </div>
 
               <div className="battle-lobby-stat-card">
                 <span className="battle-lobby-stat-label">Mode</span>
                 <strong className="battle-lobby-stat-value battle-lobby-stat-value-text">
-                  {isRanked ? "Ranked" : "Custom"}
+                  {isRanked ? "Ranked" : isHostVoting ? "Custom · Host vote" : "Custom"}
                 </strong>
               </div>
 
@@ -1970,7 +2054,7 @@ useEffect(() => {
               </div>
 
               <p className="battle-production-muted">
-                Accepted: mp3, wav, and other audio files. You can replace your upload during the 15-minute window.
+                Accepted: mp3, wav, and other audio files. You can replace your upload while the production timer is open.
               </p>
 
               <div className="battle-file-input-wrap">
@@ -2045,8 +2129,11 @@ useEffect(() => {
           </p>
 
           <p>
-  Listen to all submissions for this battle and cast your vote.
-  You can only vote once per battle. Voting closes after 2 minutes and 30 seconds.
+  {isHostVoting
+    ? currentUserIsHost
+      ? "Listen to each submission and choose the winner. This lobby uses host voting, so your vote decides the battle."
+      : "Listen to the submissions while the host chooses the winner. This lobby uses host voting."
+    : "Listen to all submissions for this battle and cast your vote. You can only vote once per battle. Voting closes after 2 minutes and 30 seconds."}
 </p>
 
 {missingSubmissionCount > 0 && (
@@ -2105,6 +2192,7 @@ useEffect(() => {
   : sub.displayName;
 
                   const isVoted = votedForUserId === sub.user_id;
+                  const canCurrentUserVote = !sub.isSelf && (!isHostVoting || currentUserIsHost);
 
                   return (
                     <div
@@ -2126,7 +2214,7 @@ useEffect(() => {
                       >
                         <h3 style={{ margin: 0 }}>{label}</h3>
 
-                        {!sub.isSelf && (
+                        {canCurrentUserVote && (
                           <button
                             onClick={() => handleVote(sub)}
                             className="btn-secondary"
@@ -2149,6 +2237,18 @@ useEffect(() => {
                             }}
                           >
                             Your track
+                          </span>
+                        )}
+
+                        {isHostVoting && !currentUserIsHost && !sub.isSelf && (
+                          <span
+                            style={{
+                              fontSize: "0.8rem",
+                              color: "#9ca3af",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Host vote only
                           </span>
                         )}
                       </div>

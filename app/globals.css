@@ -4716,3 +4716,984 @@ html {
     text-align: left;
   }
 }
+
+/* =========================================================
+   CUSTOM LOBBY BUILDER
+   ========================================================= */
+
+.battle-queue-card {
+  padding: 26px;
+  overflow: hidden;
+}
+
+.battle-queue-head h2 {
+  margin: 0 0 10px;
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  line-height: 0.95;
+  letter-spacing: -0.07em;
+}
+
+.battle-queue-head p:not(.panel-label) {
+  max-width: 700px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.battle-queue-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.custom-lobby-builder {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid rgba(140, 255, 107, 0.22);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(140, 255, 107, 0.08), transparent 34%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.custom-lobby-builder-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.custom-lobby-builder-head h3 {
+  margin: 0;
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+
+.custom-lobby-builder-pill {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid rgba(140, 255, 107, 0.35);
+  background: rgba(140, 255, 107, 0.075);
+  color: var(--green);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.custom-lobby-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.custom-lobby-field {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.custom-lobby-field-wide {
+  grid-column: 1 / -1;
+}
+
+.custom-lobby-field > span {
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.custom-lobby-field small {
+  color: var(--muted-2);
+  line-height: 1.5;
+}
+
+.custom-lobby-field input[type="number"],
+.custom-lobby-field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line-bright);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.42);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+}
+
+.custom-lobby-segment-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.custom-lobby-segment-row button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+}
+
+.custom-lobby-segment-row button.custom-lobby-segment-active {
+  color: #050505;
+  border-color: var(--green);
+  background: var(--green);
+  box-shadow: 0 0 24px rgba(140, 255, 107, 0.14);
+}
+
+.custom-lobby-upload-box {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px dashed var(--line-bright);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.custom-lobby-upload-box input {
+  color: var(--muted);
+}
+
+.custom-lobby-create-button {
+  margin-top: 16px;
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .battle-queue-card,
+  .custom-lobby-builder {
+    padding: 18px;
+  }
+
+  .custom-lobby-builder-head,
+  .battle-queue-action-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .custom-lobby-form-grid,
+  .custom-lobby-segment-row {
+    grid-template-columns: 1fr;
+  }
+}
+/* =========================================================
+   POLISHED CUSTOM LOBBY SETUP
+   Add this to the bottom of app/globals.css
+   ========================================================= */
+
+.battle-custom-panel,
+.battle-community-card {
+  margin-top: 22px;
+  padding: 22px;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.14);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 77, 28, 0.09), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+    rgba(7, 7, 7, 0.88);
+}
+
+.battle-custom-panel-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.battle-custom-panel-head h3,
+.battle-community-card h3 {
+  margin: 8px 0;
+  color: var(--text);
+  font-size: 1.35rem;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.battle-custom-panel-head p,
+.battle-community-card p {
+  max-width: 560px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.battle-custom-form-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.battle-custom-field {
+  display: grid;
+  gap: 8px;
+}
+
+.battle-custom-field-full {
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+}
+
+.battle-custom-field > span,
+.battle-custom-control-group > .panel-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.battle-custom-field small,
+.battle-custom-upload small {
+  color: var(--muted-2);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.battle-custom-field input,
+.battle-custom-field select,
+.battle-custom-upload input[type="file"] {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  color: var(--text);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025)),
+    #0b0b0b;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  outline: none;
+  font: inherit;
+  font-weight: 750;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.battle-custom-field select {
+  color-scheme: dark;
+  appearance: auto;
+}
+
+/* This is the dropdown fix: white browser option menu -> dark, readable menu */
+.battle-custom-field select option {
+  color: #f4f1e8;
+  background: #0b0b0b;
+}
+
+.battle-custom-field input:focus,
+.battle-custom-field select:focus,
+.battle-custom-upload input[type="file"]:focus {
+  border-color: rgba(255, 77, 28, 0.62);
+  box-shadow:
+    0 0 0 3px rgba(255, 77, 28, 0.11),
+    0 0 24px rgba(255, 77, 28, 0.10);
+}
+
+.battle-custom-control-group {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+}
+
+.battle-custom-segment-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.battle-custom-segment {
+  min-height: 44px;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.035);
+  border-radius: 12px !important;
+}
+
+.battle-custom-segment:hover {
+  color: var(--green);
+  border-color: rgba(140, 255, 107, 0.38);
+}
+
+.battle-custom-segment-active {
+  color: #050505;
+  border-color: var(--orange);
+  background: linear-gradient(90deg, var(--orange), #f6c65b);
+  box-shadow: 0 0 26px rgba(255, 77, 28, 0.18);
+}
+
+.battle-custom-segment-active:hover {
+  color: #050505;
+  border-color: var(--orange);
+}
+
+.battle-custom-upload {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 14px;
+}
+
+.battle-custom-submit {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+}
+
+.battle-community-card .btn-secondary {
+  margin-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .battle-custom-panel,
+  .battle-community-card {
+    padding: 18px;
+  }
+
+  .battle-custom-panel-head {
+    flex-direction: column;
+  }
+
+  .battle-custom-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-custom-segment-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
+/* =========================================================
+   CHIEF DESIGNER PASS — CUSTOM BATTLE SETUP
+   Paste at the VERY BOTTOM of app/globals.css
+   ========================================================= */
+
+.battle-custom-panel {
+  position: relative;
+  margin-top: 26px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 22px !important;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(255, 77, 28, 0.16), transparent 34%),
+    radial-gradient(circle at 100% 12%, rgba(140, 255, 107, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(7, 7, 7, 0.94);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.battle-custom-panel::before {
+  opacity: 0.28;
+  background-size: 22px 22px;
+}
+
+.battle-custom-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(255, 77, 28, 0.22), transparent 28%, transparent 72%, rgba(140, 255, 107, 0.1)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 28%);
+  opacity: 0.45;
+  mask-image: linear-gradient(to bottom, black, transparent 70%);
+}
+
+/* Header */
+
+.battle-custom-panel-head {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 22px;
+  align-items: start;
+  margin: 0;
+  padding: 26px 28px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    rgba(0, 0, 0, 0.18);
+}
+
+.battle-custom-panel-head .panel-label {
+  margin-bottom: 10px;
+  color: rgba(244, 241, 232, 0.56);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+}
+
+.battle-custom-panel-head h3 {
+  margin: 0;
+  max-width: 520px;
+  color: var(--text);
+  font-size: clamp(1.55rem, 2.3vw, 2.2rem);
+  font-weight: 900;
+  line-height: 0.98;
+  letter-spacing: -0.06em;
+}
+
+.battle-custom-panel-head p {
+  max-width: 560px;
+  margin: 12px 0 0;
+  color: rgba(244, 241, 232, 0.68);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+.custom-badge {
+  position: relative;
+  z-index: 1;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border-radius: 999px !important;
+  color: var(--green);
+  border: 1px solid rgba(140, 255, 107, 0.28);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(140, 255, 107, 0.16), transparent 70%),
+    rgba(140, 255, 107, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  font-size: 0.66rem;
+  font-weight: 950;
+  letter-spacing: 0.15em;
+  white-space: nowrap;
+}
+
+/* Body layout */
+
+.battle-custom-form-grid,
+.battle-custom-control-group,
+.battle-custom-field-full,
+.battle-custom-submit {
+  position: relative;
+  z-index: 1;
+}
+
+.battle-custom-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 22px 28px 0;
+}
+
+.battle-custom-field {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.battle-custom-field > span,
+.battle-custom-control-group > .panel-label {
+  margin: 0;
+  color: rgba(244, 241, 232, 0.58);
+  font-size: 0.68rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.battle-custom-field small,
+.battle-custom-upload small {
+  color: rgba(154, 154, 144, 0.82);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* Inputs */
+
+.battle-custom-field input,
+.battle-custom-field select {
+  width: 100%;
+  min-height: 56px;
+  padding: 0 16px;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 16px !important;
+  outline: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.025)),
+    rgba(0, 0, 0, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 14px 28px rgba(0, 0, 0, 0.18);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.battle-custom-field input:hover,
+.battle-custom-field select:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.03)),
+    rgba(0, 0, 0, 0.48);
+}
+
+.battle-custom-field input:focus,
+.battle-custom-field select:focus {
+  border-color: rgba(255, 77, 28, 0.65);
+  box-shadow:
+    0 0 0 4px rgba(255, 77, 28, 0.11),
+    0 0 30px rgba(255, 77, 28, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+/* Fix white dropdown menu / white text issue */
+
+.battle-custom-field select {
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+.battle-custom-field select option {
+  color: #f4f1e8;
+  background: #0b0b0b;
+}
+
+/* Segment groups */
+
+.battle-custom-control-group {
+  margin-top: 22px;
+  padding: 0 28px;
+}
+
+.battle-custom-control-group > .panel-label {
+  margin-bottom: 10px;
+}
+
+.battle-custom-segment-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.battle-custom-segment {
+  position: relative;
+  min-height: 54px;
+  padding: 0 18px;
+  overflow: hidden;
+  color: rgba(244, 241, 232, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 16px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  font-size: 0.75rem;
+  font-weight: 950;
+  letter-spacing: 0.13em;
+}
+
+.battle-custom-segment::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  transform: translateY(-50%);
+  transition:
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.battle-custom-segment:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.battle-custom-segment-active {
+  color: #050505;
+  border-color: rgba(255, 77, 28, 0.88);
+  background:
+    linear-gradient(135deg, #ff4d1c 0%, #ff7a2f 48%, #f6c65b 100%);
+  box-shadow:
+    0 18px 36px rgba(255, 77, 28, 0.18),
+    0 0 30px rgba(255, 77, 28, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.battle-custom-segment-active::before {
+  background: #050505;
+  box-shadow: 0 0 0 4px rgba(5, 5, 5, 0.12);
+}
+
+.battle-custom-segment-active:hover {
+  color: #050505;
+  border-color: rgba(255, 77, 28, 0.95);
+}
+
+/* Upload box */
+
+.battle-custom-upload {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 16px !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(140, 255, 107, 0.08), transparent 45%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.battle-custom-upload input[type="file"] {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px;
+  color: rgba(244, 241, 232, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 12px !important;
+  background: rgba(0, 0, 0, 0.34);
+  font-size: 0.85rem;
+}
+
+.battle-custom-upload input[type="file"]::file-selector-button {
+  min-height: 34px;
+  margin-right: 12px;
+  padding: 0 12px;
+  color: #050505;
+  border: 0;
+  border-radius: 9px;
+  background: var(--green);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+/* Submit button */
+
+.battle-custom-submit {
+  width: calc(100% - 56px);
+  min-height: 58px;
+  margin: 24px 28px 28px;
+  border-radius: 16px !important;
+  background:
+    linear-gradient(135deg, #ff3f17 0%, #ff5a22 48%, #ff7a2f 100%);
+  box-shadow:
+    0 22px 44px rgba(255, 77, 28, 0.22),
+    0 0 34px rgba(255, 77, 28, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+}
+
+.battle-custom-submit:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 26px 54px rgba(255, 77, 28, 0.28),
+    0 0 42px rgba(255, 77, 28, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.battle-custom-submit:disabled {
+  opacity: 0.58;
+  box-shadow: none;
+}
+
+/* Join custom lobby variant */
+
+.battle-custom-field-full {
+  margin: 22px 28px 0;
+}
+
+.battle-custom-field-full input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88rem;
+  letter-spacing: -0.02em;
+}
+
+/* Community card polish so it matches the new setup panel */
+
+.battle-community-card {
+  margin-top: 22px;
+  padding: 24px 26px;
+  overflow: hidden;
+  border-radius: 22px !important;
+  border-color: rgba(255, 255, 255, 0.11);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(140, 255, 107, 0.075), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    rgba(7, 7, 7, 0.86);
+}
+
+.battle-community-card h3 {
+  position: relative;
+  z-index: 1;
+  margin: 8px 0 8px;
+  font-size: 1.3rem;
+  letter-spacing: -0.035em;
+}
+
+.battle-community-card p {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+  color: rgba(244, 241, 232, 0.66);
+  line-height: 1.65;
+}
+
+.battle-community-card .btn-secondary {
+  position: relative;
+  z-index: 1;
+  margin-top: 16px;
+}
+
+/* Mobile */
+
+@media (max-width: 760px) {
+  .battle-custom-panel {
+    border-radius: 18px !important;
+  }
+
+  .battle-custom-panel-head {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 22px 18px 20px;
+  }
+
+  .custom-badge {
+    width: fit-content;
+  }
+
+  .battle-custom-form-grid {
+    grid-template-columns: 1fr;
+    padding: 20px 18px 0;
+  }
+
+  .battle-custom-control-group {
+    padding: 0 18px;
+  }
+
+  .battle-custom-segment-row {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-custom-segment {
+    justify-content: flex-start;
+    padding-left: 34px;
+  }
+
+  .battle-custom-field-full {
+    margin: 20px 18px 0;
+  }
+
+  .battle-custom-submit {
+    width: calc(100% - 36px);
+    margin: 22px 18px 22px;
+  }
+
+  .battle-community-card {
+    padding: 22px 18px;
+  }
+}
+/* =========================================================
+   Remove button hover glow/shadow
+   ========================================================= */
+
+.btn-primary:hover,
+.btn-secondary:hover,
+.battle-custom-submit:hover,
+.battle-custom-segment:hover,
+.battle-custom-segment-active:hover,
+button:hover {
+  box-shadow: none !important;
+}
+
+/* Keep primary buttons cleaner in normal state too */
+.btn-primary,
+.battle-custom-submit {
+  box-shadow: none !important;
+}
+
+/* Optional: keep active custom option from glowing */
+.battle-custom-segment-active {
+  box-shadow: none !important;
+}
+
+/* Cleaner hover behavior */
+.btn-primary:hover,
+.battle-custom-submit:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.btn-secondary:hover,
+.battle-custom-segment:hover {
+  transform: translateY(-1px);
+}
+/* =========================================================
+   Softer button hover shadows — less glow, more professional
+   Paste at VERY BOTTOM of globals.css
+   ========================================================= */
+
+/* Primary buttons: keep a very subtle shade, remove loud glow */
+.btn-primary,
+.battle-custom-submit {
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+}
+
+.btn-primary:hover,
+.battle-custom-submit:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.28),
+    0 0 10px rgba(255, 77, 28, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+}
+
+/* Secondary buttons: subtle dark lift only */
+.btn-secondary {
+  box-shadow:
+    0 6px 14px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
+}
+
+.btn-secondary:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.22),
+    0 0 8px rgba(140, 255, 107, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Custom segment buttons */
+.battle-custom-segment {
+  box-shadow:
+    0 5px 12px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
+}
+
+.battle-custom-segment:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 7px 16px rgba(0, 0, 0, 0.2),
+    0 0 8px rgba(255, 255, 255, 0.025),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Active orange option: shade yes, glow barely */
+.battle-custom-segment-active {
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.22),
+    0 0 10px rgba(255, 77, 28, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+}
+
+.battle-custom-segment-active:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.28),
+    0 0 12px rgba(255, 77, 28, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Catch-all: prevents older broad button:hover glow rules from winning */
+button:hover {
+  box-shadow:
+    0 7px 16px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+/* But preserve the more specific custom submit hover */
+.btn-primary:hover,
+.btn-secondary:hover,
+.battle-custom-submit:hover,
+.battle-custom-segment:hover,
+.battle-custom-segment-active:hover {
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    filter 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease;
+}
+/* =========================================================
+   Fix active custom option hover darkness
+   Random Sample / Everyone Votes
+   ========================================================= */
+
+.battle-custom-segment-active,
+.battle-custom-segment-active:hover,
+.battle-custom-segment-active:focus {
+  color: #050505 !important;
+  border-color: rgba(255, 106, 42, 0.95) !important;
+  background:
+    linear-gradient(135deg, #ff5a22 0%, #ff7a2f 52%, #ff9a3d 100%) !important;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+  filter: none !important;
+}
+
+/* Hover should feel lighter, not darker */
+.battle-custom-segment-active:hover {
+  background:
+    linear-gradient(135deg, #ff6a2a 0%, #ff8438 52%, #ffa54a 100%) !important;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26) !important;
+  transform: translateY(-1px);
+}
+
+/* Dot inside selected buttons */
+.battle-custom-segment-active::before,
+.battle-custom-segment-active:hover::before {
+  background: #050505 !important;
+  box-shadow: none !important;
+}
+
+/* Prevent broad button:hover rules from darkening active segments */
+button.battle-custom-segment-active:hover {
+  color: #050505 !important;
+  background:
+    linear-gradient(135deg, #ff6a2a 0%, #ff8438 52%, #ffa54a 100%) !important;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.26) !important;
+  filter: none !important;
+}

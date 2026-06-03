@@ -22,6 +22,8 @@ type LobbyResult = {
   mode: string | null;
   created_at: string | null;
   finished_at: string | null;
+  voting_style: "everyone" | "host" | null;
+  host_user_id: string | null;
 };
 
 function getOrdinal(place: number): string {
@@ -58,7 +60,7 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
 
       const { data: lobbyData, error: lobbyErr } = await supabase
         .from("battle_lobbies")
-        .select("winner_user_id, status, mode, created_at, finished_at")
+        .select("winner_user_id, status, mode, created_at, finished_at, voting_style, host_user_id")
         .eq("id", battleId)
         .single();
 
@@ -180,6 +182,7 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
 
   const winnerName = winner?.isSelf ? "You" : winner?.displayName ?? "No winner yet";
   const isRanked = lobby?.mode !== "custom";
+  const isHostVote = lobby?.voting_style === "host";
   const hasTieForFirst = rows.length > 1 && rows[0]?.votes === rows[1]?.votes;
 
   if (loading) {
@@ -213,6 +216,8 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
             {rows.length > 0
               ? hasTieForFirst
                 ? "Top submissions were tied on votes. Final placement follows the saved battle result."
+                : isHostVote
+                ? `${winnerName} was selected by the host as the winner.`
                 : `${winnerName} took the battle with ${winner?.votes ?? 0} vote${
                     winner?.votes === 1 ? "" : "s"
                   }.`
@@ -226,8 +231,8 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
             <strong>{winnerName}</strong>
           </div>
           <div className="battle-results-summary-card">
-            <span>Total votes</span>
-            <strong>{totalVotes}</strong>
+            <span>{isHostVote ? "Voting style" : "Total votes"}</span>
+            <strong>{isHostVote ? "Host" : totalVotes}</strong>
           </div>
           <div className="battle-results-summary-card">
             <span>Submissions</span>
@@ -277,7 +282,11 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
                       {isWinner && <span className="podium-winner-pill">Winner</span>}
                     </div>
                     <p>
-                      {row.votes} vote{row.votes === 1 ? "" : "s"} · {votePercent}% of total
+                      {isHostVote
+                        ? row.user_id === winner?.user_id
+                          ? "Host selection"
+                          : "Not selected"
+                        : `${row.votes} vote${row.votes === 1 ? "" : "s"} · ${votePercent}% of total`}
                     </p>
                     <div className="podium-meter-track">
                       <div
@@ -330,13 +339,21 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
                             {name}
                           </h4>
                           <p>
-                            {row.votes} vote{row.votes === 1 ? "" : "s"} · {votePercent}%
+                            {isHostVote
+                              ? row.user_id === winner?.user_id
+                                ? "Host selection"
+                                : "Not selected"
+                              : `${row.votes} vote${row.votes === 1 ? "" : "s"} · ${votePercent}%`}
                           </p>
                         </div>
                       </div>
 
                       <div className="battle-result-vote-pill">
-                        {row.votes} vote{row.votes === 1 ? "" : "s"}
+                        {isHostVote
+                          ? row.user_id === winner?.user_id
+                            ? "Host pick"
+                            : "No"
+                          : `${row.votes} vote${row.votes === 1 ? "" : "s"}`}
                       </div>
                     </div>
 

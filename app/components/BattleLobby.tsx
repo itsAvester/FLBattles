@@ -7,6 +7,7 @@ import { supabase } from "../../lib/supabaseClient";
 const INITIAL_TIME = 15 * 60; // 15 minutes in seconds
 const QUEUE_READY_TIME = 60; // 60 seconds after min players are reached
 const VOTING_TIME = 2 * 60 + 30; // 2 minutes 30 seconds
+const PRODUCTION_WARNING_SECONDS = [60, 50, 40, 30, 20, 10];
 
 type Phase = "countdown" | "upload" | "results";
 
@@ -190,8 +191,8 @@ const votingSectionRef = useRef<HTMLDivElement | null>(null);
 const previousPlayerIdsRef = useRef<Set<string>>(new Set());
 const playersLoadedOnceRef = useRef(false);
 const minPlayersSoundPlayedRef = useRef(false);
-const oneMinuteWarningPlayedRef = useRef(false);
 const finalCountdownPlayedForRef = useRef<Set<number>>(new Set());
+const warningTimerLastValueRef = useRef<number | null>(null);
 
 const playMatchStartSound = () => {
   try {
@@ -416,8 +417,8 @@ const submittedUsersLoadedRef = useRef(false);
     previousPlayerIdsRef.current = new Set();
     playersLoadedOnceRef.current = false;
     minPlayersSoundPlayedRef.current = false;
-    oneMinuteWarningPlayedRef.current = false;
     finalCountdownPlayedForRef.current = new Set();
+    warningTimerLastValueRef.current = null;
   }, [battleId]);
 
   // ───────────────── LOBBY: fetch & realtime ─────────────────
@@ -992,19 +993,41 @@ useEffect(() => {
   }, [lobby?.status, lobby?.battle_started_at, debugStartTime, phase]);
 
   useEffect(() => {
-    if (!matchStarted || phase !== "countdown") return;
-
-    if (timeLeft === 60 && !oneMinuteWarningPlayedRef.current) {
-      oneMinuteWarningPlayedRef.current = true;
-      playOneMinuteWarningSound();
+    if (!matchStarted || phase !== "countdown") {
+      warningTimerLastValueRef.current = null;
+      return;
     }
 
-    if (
-      timeLeft <= 10 &&
-      timeLeft > 0 &&
-      !finalCountdownPlayedForRef.current.has(timeLeft)
-    ) {
-      finalCountdownPlayedForRef.current.add(timeLeft);
+    const previousTimeLeft = warningTimerLastValueRef.current;
+    warningTimerLastValueRef.current = timeLeft;
+
+    // Arm the warning system on the first live tick without playing a catch-up sound.
+    // This prevents users who reload at 0:45 from hearing the 1:00 and 0:50 alerts at once.
+    if (previousTimeLeft === null) return;
+
+    // If the timer resets upward for a new battle, clear the per-threshold warning memory.
+    if (timeLeft > previousTimeLeft) {
+      finalCountdownPlayedForRef.current = new Set();
+      return;
+    }
+
+    const crossedWarnings = PRODUCTION_WARNING_SECONDS.filter(
+      (warningSecond) =>
+        previousTimeLeft > warningSecond &&
+        timeLeft <= warningSecond &&
+        timeLeft > 0 &&
+        !finalCountdownPlayedForRef.current.has(warningSecond)
+    );
+
+    if (crossedWarnings.length === 0) return;
+
+    // If a tab lags and crosses more than one threshold, play only the most urgent one.
+    const warningSecond = crossedWarnings[crossedWarnings.length - 1];
+    finalCountdownPlayedForRef.current.add(warningSecond);
+
+    if (warningSecond === 60) {
+      playOneMinuteWarningSound();
+    } else {
       playCountdownDink();
     }
   }, [timeLeft, matchStarted, phase]);
@@ -1259,6 +1282,8 @@ if (submissions.length === 1 || count >= requiredVotes) {
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = String(timeLeft % 60).padStart(2, "0");
+  const roundTimerDisplay = `${minutes}:${seconds}`;
+  const timerIsUrgent = matchStarted && phase === "countdown" && timeLeft <= 60 && timeLeft > 0;
   const votingMinutes = Math.floor(votingTimeLeft / 60);
   const votingSeconds = String(votingTimeLeft % 60).padStart(2, "0");
   const votingClosed = votingTimeLeft <= 0 || lobby?.status === "finished";
@@ -1643,7 +1668,16 @@ useEffect(() => {
                 </h3>
               </div>
 
-              {!matchStarted && (
+              {matchStarted && phase !== "results" ? (
+                <div
+                  className={`battle-lobby-top-timer ${
+                    timerIsUrgent ? "battle-lobby-top-timer-urgent" : ""
+                  }`}
+                >
+                  <span>Round timer</span>
+                  <strong>{roundTimerDisplay}</strong>
+                </div>
+              ) : (
                 <div className="battle-lobby-status-chip">
                   {queueReady
                     ? `Auto-start in ${formatQueueEta(autoStartEta)}`
@@ -1661,9 +1695,15 @@ useEffect(() => {
                 </strong>
               </div>
 
-              <div className="battle-lobby-stat-card">
-                <span className="battle-lobby-stat-label">Round</span>
-                <strong className="battle-lobby-stat-value battle-lobby-stat-value-text">15:00</strong>
+              <div
+                className={`battle-lobby-stat-card battle-lobby-stat-card-timer ${
+                  timerIsUrgent ? "battle-lobby-stat-card-timer-urgent" : ""
+                }`}
+              >
+                <span className="battle-lobby-stat-label">Round timer</span>
+                <strong className="battle-lobby-stat-value battle-lobby-stat-value-text">
+                  {matchStarted && phase !== "results" ? roundTimerDisplay : "15:00"}
+                </strong>
               </div>
 
               <div className="battle-lobby-stat-card">
@@ -1798,9 +1838,13 @@ useEffect(() => {
               <h3 className="battle-production-title">Make your beat</h3>
             </div>
 
-            <div className="battle-production-timer">
+            <div
+              className={`battle-production-timer ${
+                timerIsUrgent ? "battle-production-timer-urgent" : ""
+              }`}
+            >
               <span>Time left</span>
-              <strong>{minutes}:{seconds}</strong>
+              <strong>{roundTimerDisplay}</strong>
             </div>
           </div>
 

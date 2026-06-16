@@ -196,8 +196,7 @@ export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
 
   console.log("BattleLobby mounted with battleId:", battleId);
 
-  const mode = searchParams.get("mode") ?? "ranked";
-  const isRanked = mode !== "custom";
+  const requestedMode = searchParams.get("mode") ?? "ranked";
 const activeBattleIdRef = useRef<string>(battleId);
 const playedStartSoundFor = useRef<string | null>(null);
 const votingSectionRef = useRef<HTMLDivElement | null>(null);
@@ -345,6 +344,9 @@ const submittedUsersLoadedRef = useRef(false);
   const [autoStartEta, setAutoStartEta] = useState<number | null>(null);
   const [debugStarting, setDebugStarting] = useState(false);
   const [debugError, setDebugError] = useState<string | null>(null);
+  const [hostStartingBattle, setHostStartingBattle] = useState(false);
+  const [hostEndingVoting, setHostEndingVoting] = useState(false);
+  const [hostControlError, setHostControlError] = useState<string | null>(null);
   const [missingSubmissionCount, setMissingSubmissionCount] = useState(0);
 
   // timer / phase
@@ -393,8 +395,11 @@ const submittedUsersLoadedRef = useRef(false);
 
   const battleDurationSeconds = lobby?.battle_duration_seconds ?? INITIAL_TIME;
   const battleDurationDisplay = formatDuration(battleDurationSeconds);
+  const isCustomLobby = lobby?.mode === "custom" || requestedMode === "custom";
+  const isRanked = !isCustomLobby;
   const isHostVoting = lobby?.voting_style === "host";
   const currentUserIsHost = !!currentUserId && currentUserId === lobby?.host_user_id;
+  const customVotingOpen = isCustomLobby && lobby?.status === "voting";
 
   // leaving / penalty
   const [leaving, setLeaving] = useState(false);
@@ -410,6 +415,9 @@ const submittedUsersLoadedRef = useRef(false);
     setAutoStartEta(null);
     setDebugStarting(false);
     setDebugError(null);
+    setHostStartingBattle(false);
+    setHostEndingVoting(false);
+    setHostControlError(null);
     setTimeLeft(INITIAL_TIME);
     setPhase("countdown");
     setDebugStartTime(null);
@@ -1007,6 +1015,89 @@ useEffect(() => {
     }
   };
 
+  const handleHostStartCustomBattle = async () => {
+    if (!lobby) return;
+
+    setHostControlError(null);
+
+    if (!isCustomLobby) {
+      setHostControlError("Only custom lobbies can be started manually.");
+      return;
+    }
+
+    if (!currentUserIsHost) {
+      setHostControlError("Only the host can start this custom battle.");
+      return;
+    }
+
+    if (playerCount < 2) {
+      setHostControlError("At least 2 players are required to start a custom battle.");
+      return;
+    }
+
+    setHostStartingBattle(true);
+
+    try {
+      const { error } = await supabase.rpc("start_custom_battle", {
+        p_lobby_id: battleId,
+      });
+
+      if (error) {
+        console.error("start_custom_battle error:", error);
+        throw new Error(error.message || "Failed to start custom battle.");
+      }
+
+      await refreshLobbyState();
+    } catch (err: any) {
+      console.error("Unexpected start_custom_battle error:", err);
+      setHostControlError(err.message || "Failed to start custom battle.");
+    } finally {
+      setHostStartingBattle(false);
+    }
+  };
+
+  const handleHostEndCustomVoting = async () => {
+    if (!lobby) return;
+
+    setHostControlError(null);
+
+    if (!isCustomLobby) {
+      setHostControlError("Only custom lobby voting can be ended manually.");
+      return;
+    }
+
+    if (!currentUserIsHost) {
+      setHostControlError("Only the host can end voting.");
+      return;
+    }
+
+    if (lobby.status !== "voting") {
+      setHostControlError("This battle is not currently in voting.");
+      return;
+    }
+
+    setHostEndingVoting(true);
+
+    try {
+      const { error } = await supabase.rpc("end_custom_voting", {
+        p_lobby_id: battleId,
+      });
+
+      if (error) {
+        console.error("end_custom_voting error:", error);
+        throw new Error(error.message || "Failed to end voting.");
+      }
+
+      setAllVotesIn(true);
+      router.push(`/battles/${battleId}/results`);
+    } catch (err: any) {
+      console.error("Unexpected end_custom_voting error:", err);
+      setHostControlError(err.message || "Failed to end voting.");
+    } finally {
+      setHostEndingVoting(false);
+    }
+  };
+
   // ───────────────── SAMPLE FETCH ─────────────────
 
   // When match has started, load the battle sample.
@@ -1157,8 +1248,18 @@ useEffect(() => {
 
   // Visible voting timer. The database is still the authority via voting_ends_at.
   useEffect(() => {
-    if (phase !== "results" || !lobby?.voting_ends_at || lobby.status === "finished") {
+    if (phase !== "results" || lobby?.status === "finished") {
       setVotingTimeLeft(lobby?.status === "finished" ? 0 : VOTING_TIME);
+      return;
+    }
+
+    if (isCustomLobby) {
+      setVotingTimeLeft(VOTING_TIME);
+      return;
+    }
+
+    if (!lobby?.voting_ends_at) {
+      setVotingTimeLeft(VOTING_TIME);
       return;
     }
 
@@ -1173,7 +1274,7 @@ useEffect(() => {
     const interval = setInterval(tick, 1000);
 
     return () => clearInterval(interval);
-  }, [phase, lobby?.status, lobby?.voting_ends_at]);
+  }, [phase, lobby?.status, lobby?.voting_ends_at, isCustomLobby]);
 
   useEffect(() => {
     if (phase !== "results") return;
@@ -1370,7 +1471,7 @@ setLoadingSubmissions(false);
         .select("id", { count: "exact", head: true })
         .eq("battle_id", battleId);
 
-      if (!error && count != null && !cancelled) {
+      if (!isCustomLobby && !error && count != null && !cancelled) {
         let effectiveVoteCount = count;
         let requiredVotes = submissions.length <= 1 ? 0 : submissions.length;
 
@@ -1418,7 +1519,7 @@ setLoadingSubmissions(false);
       cancelled = true;
       clearInterval(interval);
     };
-  }, [phase, battleId, submissions.length, router, isHostVoting, lobby?.host_user_id]);
+  }, [phase, battleId, submissions.length, router, isHostVoting, lobby?.host_user_id, isCustomLobby]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = String(timeLeft % 60).padStart(2, "0");
@@ -1426,7 +1527,9 @@ setLoadingSubmissions(false);
   const timerIsUrgent = matchStarted && phase === "countdown" && timeLeft <= 60 && timeLeft > 0;
   const votingMinutes = Math.floor(votingTimeLeft / 60);
   const votingSeconds = String(votingTimeLeft % 60).padStart(2, "0");
-  const votingClosed = votingTimeLeft <= 0 || lobby?.status === "finished";
+  const votingClosed = isCustomLobby
+    ? lobby?.status === "finished"
+    : votingTimeLeft <= 0 || lobby?.status === "finished";
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
@@ -1816,7 +1919,15 @@ useEffect(() => {
               <div>
                 <p className="battle-lobby-section-label">Lobby status</p>
                 <h3 className="battle-lobby-status-title">
-                  {queueReady ? "Queue ready" : matchStarted ? "Battle in progress" : "Waiting for players"}
+                  {matchStarted
+                    ? "Battle in progress"
+                    : isCustomLobby && currentUserIsHost && playerCount >= 2
+                    ? "Ready to start"
+                    : isCustomLobby
+                    ? "Waiting for host"
+                    : queueReady
+                    ? "Queue ready"
+                    : "Waiting for players"}
                 </h3>
               </div>
 
@@ -1831,7 +1942,13 @@ useEffect(() => {
                 </div>
               ) : (
                 <div className="battle-lobby-status-chip">
-                  {queueReady
+                  {isCustomLobby
+                    ? currentUserIsHost
+                      ? playerCount >= 2
+                        ? "Host controls start"
+                        : `${Math.max(2 - playerCount, 0)} needed`
+                      : "Waiting for host"
+                    : queueReady
                     ? `Auto-start in ${formatQueueEta(autoStartEta)}`
                     : `${playersNeeded} needed`}
                 </div>
@@ -1868,7 +1985,15 @@ useEffect(() => {
               <div className="battle-lobby-stat-card">
                 <span className="battle-lobby-stat-label">Status</span>
                 <strong className="battle-lobby-stat-value battle-lobby-stat-value-text">
-                  {matchStarted ? "Live" : queueReady ? "Ready" : "Queued"}
+                  {matchStarted
+                    ? "Live"
+                    : isCustomLobby
+                    ? currentUserIsHost && playerCount >= 2
+                      ? "Ready"
+                      : "Waiting"
+                    : queueReady
+                    ? "Ready"
+                    : "Queued"}
                 </strong>
               </div>
             </div>
@@ -1922,7 +2047,15 @@ useEffect(() => {
                   <div>
                     <p className="battle-lobby-section-label">Matchmaking</p>
                     <h4 className="battle-lobby-matchmaking-title">
-                      {queueReady
+                      {isCustomLobby
+                        ? currentUserIsHost
+                          ? playerCount >= 2
+                            ? "Ready when you are"
+                            : `Need ${Math.max(2 - playerCount, 0)} more player${
+                                Math.max(2 - playerCount, 0) === 1 ? "" : "s"
+                              }`
+                          : "Waiting for host"
+                        : queueReady
                         ? `Starting in ${formatQueueEta(autoStartEta)}`
                         : `Need ${playersNeeded} more player${playersNeeded === 1 ? "" : "s"}`}
                     </h4>
@@ -1965,10 +2098,82 @@ useEffect(() => {
                 </div>
 
                 <p className="battle-lobby-matchmaking-footnote">
-                  {queueReady
+                  {isCustomLobby
+                    ? currentUserIsHost
+                      ? playerCount >= 2
+                        ? "Minimum players reached. Start the custom battle whenever you are ready."
+                        : "Custom battles require at least 2 active players before the host can start."
+                      : "This is a custom lobby. The battle will begin when the host starts it."
+                    : queueReady
                     ? `Minimum players reached. The battle will start automatically in ${formatQueueEta(autoStartEta)} or immediately if the lobby fills to ${lobby.max_players}.`
                     : `The queue will begin once at least ${lobby.min_players} players have joined. The lobby can hold up to ${lobby.max_players} players.`}
                 </p>
+
+                {isCustomLobby && (
+                  <div
+                    style={{
+                      marginTop: 16,
+                      padding: "14px",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(0,0,0,0.22)",
+                      borderRadius: 14,
+                    }}
+                  >
+                    {currentUserIsHost ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={handleHostStartCustomBattle}
+                          disabled={hostStartingBattle || playerCount < 2}
+                        >
+                          {hostStartingBattle
+                            ? "Starting Battle..."
+                            : playerCount < 2
+                            ? "Need 2 Players"
+                            : "Start Battle"}
+                        </button>
+
+                        <p
+                          style={{
+                            margin: "10px 0 0",
+                            color: "var(--muted)",
+                            fontSize: "0.9rem",
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {playerCount < 2
+                            ? "Invite at least one more player before starting."
+                            : "Starting the battle locks the lobby and begins the production timer."}
+                        </p>
+                      </>
+                    ) : (
+                      <p
+                        style={{
+                          margin: 0,
+                          color: "var(--muted)",
+                          fontSize: "0.95rem",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        Waiting for the host to start the battle.
+                      </p>
+                    )}
+
+                    {hostControlError && (
+                      <p
+                        style={{
+                          margin: "10px 0 0",
+                          color: "#f97373",
+                          fontSize: "0.9rem",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {hostControlError}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2117,6 +2322,8 @@ useEffect(() => {
               fontWeight: 800,
               color: votingClosed
                 ? "#f97373"
+                : isCustomLobby
+                ? "#22c55e"
                 : votingTimeLeft <= 30
                 ? "#facc15"
                 : "#22c55e",
@@ -2125,16 +2332,85 @@ useEffect(() => {
           >
             {votingClosed
               ? "Voting closed"
+              : isCustomLobby
+              ? currentUserIsHost
+                ? "Voting is open — end it whenever you are ready."
+                : "Voting is open — waiting for the host to end voting."
               : `Voting time left: ${votingMinutes}:${votingSeconds}`}
           </p>
 
           <p>
-  {isHostVoting
-    ? currentUserIsHost
-      ? "Listen to each submission and choose the winner. This lobby uses host voting, so your vote decides the battle."
-      : "Listen to the submissions while the host chooses the winner. This lobby uses host voting."
-    : "Listen to all submissions for this battle and cast your vote. You can only vote once per battle. Voting closes after 2 minutes and 30 seconds."}
-</p>
+            {isHostVoting
+              ? currentUserIsHost
+                ? "Listen to each submission and choose the winner. This lobby uses host voting, so your vote decides the battle. Voting ends when you click End Voting."
+                : "Listen to the submissions while the host chooses the winner. This lobby uses host voting."
+              : isCustomLobby
+              ? currentUserIsHost
+                ? "Everyone can vote in this custom lobby. Voting has no timer — end it whenever you are ready."
+                : "Listen to all submissions and cast your vote. Voting has no timer and ends when the host closes it."
+              : "Listen to all submissions for this battle and cast your vote. You can only vote once per battle. Voting closes after 2 minutes and 30 seconds."}
+          </p>
+
+          {customVotingOpen && (
+            <div
+              style={{
+                marginTop: 14,
+                marginBottom: 14,
+                padding: "14px",
+                border: "1px solid rgba(140, 255, 107, 0.28)",
+                background: "rgba(140, 255, 107, 0.08)",
+                borderRadius: 14,
+              }}
+            >
+              {currentUserIsHost ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={handleHostEndCustomVoting}
+                    disabled={hostEndingVoting}
+                  >
+                    {hostEndingVoting ? "Ending Voting..." : "End Voting"}
+                  </button>
+
+                  <p
+                    style={{
+                      margin: "10px 0 0",
+                      color: "var(--muted)",
+                      fontSize: "0.9rem",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    This will finalize the custom battle and send everyone to results.
+                  </p>
+                </>
+              ) : (
+                <p
+                  style={{
+                    margin: 0,
+                    color: "var(--muted)",
+                    fontSize: "0.95rem",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Waiting for the host to end voting.
+                </p>
+              )}
+
+              {hostControlError && (
+                <p
+                  style={{
+                    margin: "10px 0 0",
+                    color: "#f97373",
+                    fontSize: "0.9rem",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {hostControlError}
+                </p>
+              )}
+            </div>
+          )}
 
 {missingSubmissionCount > 0 && (
   <div

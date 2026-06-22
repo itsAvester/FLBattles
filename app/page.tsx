@@ -11,28 +11,58 @@ export default function HomePage() {
           <div className="hero-copy">
             <div className="eyebrow">
               <span className="eyebrow-dot" />
-              Ranked sample beat battles · real-time matchmaking
+              Private sample battles · ranked queue · real-time voting
             </div>
 
             <h1>
-              Live Sample
+              Host Live
               <br />
               Beat Battles
             </h1>
 
             <p className="hero-description">
-              Every producer gets the same sample. Flip it, upload your beat,
-              earn votes, and climb the ranked producer ladder.
+              Create a private lobby, invite producers with one link, and battle
+              over the same sample. Built for friend groups, Discord servers,
+              producer communities, and ranked competitors.
             </p>
 
             <div className="hero-actions">
               <a href="/battles" className="btn-primary">
-                Enter Ranked Queue
+                Create Custom Lobby
               </a>
 
-              <a href="#how-it-works" className="btn-secondary">
-                How It Works
+              <a href="/battles" className="btn-secondary">
+                Enter Ranked Queue
               </a>
+            </div>
+
+            <div className="custom-flow-card">
+              <div className="custom-flow-topline">
+                <span className="panel-label">Custom lobby flow</span>
+                <span className="custom-flow-badge">Private link</span>
+              </div>
+
+              <div className="custom-flow-steps">
+                <div>
+                  <strong>01</strong>
+                  <span>Create a lobby</span>
+                </div>
+
+                <div>
+                  <strong>02</strong>
+                  <span>Invite producers</span>
+                </div>
+
+                <div>
+                  <strong>03</strong>
+                  <span>Flip the sample</span>
+                </div>
+
+                <div>
+                  <strong>04</strong>
+                  <span>Vote for a winner</span>
+                </div>
+              </div>
             </div>
 
             <div className="hero-stats hero-stats-three">
@@ -46,20 +76,21 @@ export default function HomePage() {
 
               <div className="hero-stat-item">
                 <div className="hero-stat-icon">◉</div>
-                <strong>Live</strong>
-                <span>Ranked Queue</span>
+                <strong>Private</strong>
+                <span>Custom Lobbies</span>
               </div>
 
               <div className="hero-stat-item">
                 <div className="hero-stat-icon">♕</div>
-                <strong>Top 10</strong>
-                <span>Ranked Ladder</span>
+                <strong>Ranked</strong>
+                <span>Live Ladder</span>
               </div>
             </div>
 
             <p className="mini-note">
-              Join <RegisteredProducerCount suffix="+" /> registered producers
-              competing in live ranked sample-flip beat battles.
+              Join <RegisteredProducerCount suffix="+" /> producers using FL
+              Battles to host private beat battles and compete in ranked sample
+              flips.
             </p>
           </div>
 
@@ -74,15 +105,15 @@ export default function HomePage() {
         <div className="section-heading">
           <div className="eyebrow centered">
             <span className="eyebrow-dot" />
-            How it works
+            How custom battles work
           </div>
 
-          <h2>Everyone gets the same sample. The best flip wins.</h2>
+          <h2>Send one link. Everyone flips the same sample.</h2>
 
           <p>
-            FL Battles is designed to feel quick, competitive, and repeatable.
-            No month-long contests. No complicated rules. Just short rounds and
-            real feedback.
+            FL Battles is built for quick private sessions and competitive
+            ranked reps. Hosts can bring their own group, start a battle, and
+            crown a winner without complicated setup.
           </p>
         </div>
 
@@ -90,33 +121,33 @@ export default function HomePage() {
           <div className="card feature-card">
             <span className="card-number">01</span>
 
-            <h3>Queue up</h3>
+            <h3>Create a private lobby</h3>
 
             <p>
-              Join a ranked lobby with other producers. Once enough players are
-              in, the round starts.
+              Start a custom beat battle for your friends, Discord server,
+              stream, class, or producer community.
             </p>
           </div>
 
           <div className="card feature-card">
             <span className="card-number">02</span>
 
-            <h3>Flip the sample</h3>
+            <h3>Invite with one link</h3>
 
             <p>
-              Everyone receives the same sample and 15 minutes to make the best
-              possible flip.
+              Share the lobby link and let producers join directly. No need to
+              wait for random matchmaking.
             </p>
           </div>
 
           <div className="card feature-card">
             <span className="card-number">03</span>
 
-            <h3>Upload & vote</h3>
+            <h3>Battle, vote, and replay</h3>
 
             <p>
-              Submit your clip, vote on other beats, and gain rating when your
-              track wins.
+              Everyone flips the same sample, uploads their beat, votes, and
+              gets a winner fast.
             </p>
           </div>
         </div>
@@ -127,63 +158,66 @@ export default function HomePage() {
         <div>
           <div className="eyebrow">
             <span className="eyebrow-dot" />
-            Built for better reps
+            Built for producer communities
           </div>
 
-          <h2>Built for producers who want reps, not perfection.</h2>
+          <h2>The easiest way to run a live beat battle online.</h2>
 
           <p>
-            The goal is simple: finish more ideas. Short-time pressure forces
-            you to commit, experiment, and practice faster.
+            Custom lobbies make FL Battles useful even when the ranked queue is
+            quiet. One host can bring a whole group, run a focused battle, and
+            turn casual traffic into real sessions.
           </p>
 
           <div className="check-list">
             <div>
               <span>✓</span>
-              Fast rounds that fit between classes, sessions, or breaks.
+              Private lobbies for friends, Discords, streams, and producer
+              groups.
             </div>
 
             <div>
               <span>✓</span>
-              Ranked tiers from Bronze to Champion so progress feels visible.
+              Fast sample-flip battles that are easy to repeat.
+            </div>
+
+            <div>
+              <span>✓</span>
+              Ranked queue stays available for producers who want ladder
+              competition.
             </div>
 
             <div>
               <span>✓</span>
               Simple uploads and voting instead of complicated contest rules.
             </div>
-
-            <div>
-              <span>✓</span>
-              Build a folder of ideas you can turn into full tracks later.
-            </div>
           </div>
         </div>
 
         <div className="card roadmap-card">
-          <p className="panel-label">Coming soon</p>
+          <p className="panel-label">Best for</p>
 
-          <h3>Coming next</h3>
+          <h3>Host-ready battles</h3>
 
           <div className="roadmap-list">
             <div>
               <span>01</span>
-              Custom lobbies for friends and Discord servers
+              Producer Discord events and community nights
             </div>
 
             <div>
               <span>02</span>
-              Season-based leaderboards and rewards
+              Friend group challenges and private sessions
             </div>
 
             <div>
               <span>03</span>
-              Profile stats, streaks, win rate, and favorite genres
+              Streamer-hosted beat battles with live voting
             </div>
 
             <div>
               <span>04</span>
-              Genre filters and themed battle nights
+              Ranked players who want extra reps between queues
             </div>
           </div>
         </div>
@@ -194,24 +228,24 @@ export default function HomePage() {
         <div className="card final-cta">
           <div className="eyebrow centered">
             <span className="eyebrow-dot" />
-            Ready to battle?
+            Ready to host?
           </div>
 
-          <h2>Join the next live sample-flip battle.</h2>
+          <h2>Create a private beat battle in seconds.</h2>
 
           <p>
-            Log in, join the ranked queue, and flip the next sample before the
-            timer ends. Every round gives you feedback, practice, and a shot at
-            climbing the ladder.
+            Start a custom lobby, invite producers with a link, and run a live
+            sample battle with your own group. Ranked battles are still there
+            when you want to compete on the ladder.
           </p>
 
           <div className="hero-actions centered-actions">
             <a href="/battles" className="btn-primary">
-              Enter Ranked Queue
+              Create Custom Lobby
             </a>
 
-            <a href="/faq" className="btn-secondary">
-              Learn More
+            <a href="/battles" className="btn-secondary">
+              Enter Ranked Queue
             </a>
           </div>
         </div>

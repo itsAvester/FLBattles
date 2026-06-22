@@ -23,7 +23,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <NavBar />
         <div className="beta-banner">
   <span className="beta-pill">LIVE BETA</span>
-  <span><RegisteredProducerCount suffix="+ Producers" /> Competing · Even More Features Added to Custom Lobbies · New Samples Added 6/16 !</span>
+  <span>
+    Host a private beat battle in seconds · Invite friends with a lobby link ·{" "}
+    <RegisteredProducerCount suffix="+ producers joined" />
+  </span>
 </div>
         <main className="page">{children}</main>
         <Analytics />

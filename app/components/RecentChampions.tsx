@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
+type BattleMode = "ranked" | "custom";
+
 type Champion = {
   battle_id: string;
   winner_name: string | null;
   finished_at: string;
+  battle_mode: BattleMode | null;
 };
 
 function timeAgo(dateString: string) {
@@ -25,6 +28,18 @@ function timeAgo(dateString: string) {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
+function getBattleLabel(mode: BattleMode | null) {
+  if (mode === "custom") return "Won a custom battle";
+  if (mode === "ranked") return "Won a ranked battle";
+  return "Won a battle";
+}
+
+function getModeLabel(mode: BattleMode | null) {
+  if (mode === "custom") return "Custom";
+  if (mode === "ranked") return "Ranked";
+  return "Battle";
+}
+
 export default function RecentChampions() {
   const [champions, setChampions] = useState<Champion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +50,7 @@ export default function RecentChampions() {
 
       const { data, error } = await supabase
         .from("live_activity_battle_winners")
-        .select("battle_id, winner_name, finished_at")
+        .select("battle_id, winner_name, finished_at, battle_mode")
         .order("finished_at", { ascending: false })
         .limit(6);
 
@@ -45,7 +60,7 @@ export default function RecentChampions() {
         return;
       }
 
-      setChampions(data || []);
+      setChampions((data || []) as Champion[]);
       setLoading(false);
     };
 
@@ -60,7 +75,7 @@ export default function RecentChampions() {
           Recent Champions
         </div>
 
-        <span className="activity-header-tag">Ranked</span>
+        <span className="activity-header-tag">Live</span>
       </div>
 
       <div className="recent-champions-list">
@@ -80,11 +95,21 @@ export default function RecentChampions() {
 
               <div className="recent-champion-copy">
                 <strong>{champion.winner_name || "A producer"}</strong>
-                <span>Won a ranked battle</span>
+                <span>{getBattleLabel(champion.battle_mode)}</span>
               </div>
 
-              <div className="recent-champion-time">
-                {timeAgo(champion.finished_at)}
+              <div className="recent-champion-meta">
+                <span
+                  className={`recent-champion-mode recent-champion-mode-${
+                    champion.battle_mode || "default"
+                  }`}
+                >
+                  {getModeLabel(champion.battle_mode)}
+                </span>
+
+                <span className="recent-champion-time">
+                  {timeAgo(champion.finished_at)}
+                </span>
               </div>
             </div>
           ))

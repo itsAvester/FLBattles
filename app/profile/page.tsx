@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
 import { computeRankTier, RankTier } from "../../lib/rankUtils";
+import { BADGE_LIST, BadgeIcon, getBadgeByKey, type BadgeMeta } from "../../lib/badges";
 
 type ProfileRow = {
   id: string;
@@ -29,171 +30,6 @@ type SampleCounts = {
   rejected: number;
   total: number;
 };
-
-type BadgeMeta = {
-  key: string;
-  icon: string;
-  name: string;
-  description: string;
-  unlockText: string;
-  tone:
-    | "champion"
-    | "goat"
-    | "perfect"
-    | "fire"
-    | "veteran"
-    | "regular"
-    | "rising"
-    | "default";
-};
-
-const BADGE_CATALOG: BadgeMeta[] = [
-  {
-    key: "champion",
-    icon: "👑",
-    name: "Champion",
-    description: "The current king of the ranked ladder.",
-    unlockText: "Reach #1 on the leaderboard.",
-    tone: "champion",
-  },
-  {
-    key: "top_10",
-    icon: "🐐",
-    name: "Top 10",
-    description: "A visible mark for elite ranked producers.",
-    unlockText: "Reach the top 10 on the leaderboard.",
-    tone: "goat",
-  },
-  {
-    key: "perfect_record",
-    icon: "🧊",
-    name: "Perfect Record",
-    description: "Clean wins, no blemishes.",
-    unlockText: "Hold a 100% win rate with 3+ battles.",
-    tone: "perfect",
-  },
-  {
-    key: "hot_streak",
-    icon: "🔥",
-    name: "Hot Streak",
-    description: "For producers who are currently on a run.",
-    unlockText: "Coming soon: win 3 battles in a row.",
-    tone: "fire",
-  },
-  {
-    key: "veteran",
-    icon: "🎧",
-    name: "Veteran",
-    description: "Battle-tested and active.",
-    unlockText: "Play 10 ranked battles.",
-    tone: "veteran",
-  },
-  {
-    key: "ranked_regular",
-    icon: "💿",
-    name: "Ranked Regular",
-    description: "You are officially in the rotation.",
-    unlockText: "Play 5 ranked battles.",
-    tone: "regular",
-  },
-  {
-    key: "rising_producer",
-    icon: "⚡",
-    name: "Rising Producer",
-    description: "Momentum is building.",
-    unlockText: "Reach 50 rating.",
-    tone: "rising",
-  },
-  {
-    key: "first_win",
-    icon: "🥇",
-    name: "First Win",
-    description: "Your first ranked win on FL Battles.",
-    unlockText: "Win your first battle.",
-    tone: "champion",
-  },
-];
-
-function getBadgeByKey(key: string | null | undefined): BadgeMeta | null {
-  if (!key) return null;
-  return BADGE_CATALOG.find((badge) => badge.key === key) ?? null;
-}
-
-function getBadgeStyle(
-  tone: BadgeMeta["tone"],
-  options?: { locked?: boolean; selected?: boolean }
-): React.CSSProperties {
-  const locked = options?.locked ?? false;
-  const selected = options?.selected ?? false;
-
-  const base: React.CSSProperties = {
-    width: 44,
-    height: 44,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(255,255,255,0.05)",
-    boxShadow: selected
-      ? "0 0 0 3px rgba(140,255,107,0.12), inset 0 0 0 1px rgba(255,255,255,0.035)"
-      : "inset 0 0 0 1px rgba(255,255,255,0.025)",
-    fontSize: "1.2rem",
-    flexShrink: 0,
-    filter: locked ? "grayscale(1)" : "none",
-    opacity: locked ? 0.38 : 1,
-  };
-
-  if (locked) return base;
-
-  switch (tone) {
-    case "champion":
-      return {
-        ...base,
-        border: "1px solid rgba(246,198,91,0.48)",
-        background:
-          "radial-gradient(circle at 30% 20%, rgba(246,198,91,0.28), rgba(255,77,28,0.11))",
-      };
-    case "goat":
-      return {
-        ...base,
-        border: "1px solid rgba(255,116,67,0.38)",
-        background: "rgba(255,77,28,0.1)",
-      };
-    case "perfect":
-      return {
-        ...base,
-        border: "1px solid rgba(186,230,253,0.38)",
-        background: "rgba(14,165,233,0.1)",
-      };
-    case "fire":
-      return {
-        ...base,
-        border: "1px solid rgba(255,77,28,0.44)",
-        background: "rgba(255,77,28,0.12)",
-      };
-    case "veteran":
-      return {
-        ...base,
-        border: "1px solid rgba(209,213,219,0.28)",
-        background: "rgba(209,213,219,0.08)",
-      };
-    case "regular":
-      return {
-        ...base,
-        border: "1px solid rgba(246,198,91,0.32)",
-        background: "rgba(246,198,91,0.08)",
-      };
-    case "rising":
-      return {
-        ...base,
-        border: "1px solid rgba(140,255,107,0.32)",
-        background: "rgba(140,255,107,0.08)",
-      };
-    default:
-      return base;
-  }
-}
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -369,7 +205,7 @@ export default function ProfilePage() {
           : prev
       );
 
-      setBadgeMessage(`${badge.icon} ${badge.name} is now your display badge.`);
+      setBadgeMessage(`${badge.name} is now your display badge.`);
     } finally {
       setBadgeSaving(null);
     }
@@ -557,7 +393,7 @@ export default function ProfilePage() {
         <div className="profile-card-header">
           <p className="panel-label">Badge collection</p>
           <span className="sample-badge">
-            {unlockedCount}/{BADGE_CATALOG.length} unlocked
+            {unlockedCount}/{BADGE_LIST.length} unlocked
           </span>
         </div>
 
@@ -593,13 +429,7 @@ export default function ProfilePage() {
                 alignItems: "center",
               }}
             >
-              <span
-                style={getBadgeStyle(selectedBadge?.tone ?? "default", {
-                  selected: true,
-                })}
-              >
-                {selectedBadge?.icon ?? "🎛️"}
-              </span>
+              <BadgeIcon badgeKey={profile.selected_badge_key} size={44} selected />
 
               <div>
                 <p
@@ -647,7 +477,7 @@ export default function ProfilePage() {
               gap: 10,
             }}
           >
-            {BADGE_CATALOG.map((badge) => {
+            {BADGE_LIST.map((badge) => {
               const isUnlocked = unlockedBadgeKeys.has(badge.key);
               const isSelected = profile.selected_badge_key === badge.key;
               const isSavingThis = badgeSaving === badge.key;
@@ -691,14 +521,12 @@ export default function ProfilePage() {
                     transform: "none",
                   }}
                 >
-                  <span
-                    style={getBadgeStyle(badge.tone, {
-                      locked: !isUnlocked,
-                      selected: isSelected,
-                    })}
-                  >
-                    {isUnlocked ? badge.icon : "🔒"}
-                  </span>
+                  <BadgeIcon
+                    badgeKey={badge.key}
+                    size={44}
+                    locked={!isUnlocked}
+                    selected={isSelected}
+                  />
 
                   <span style={{ minWidth: 0 }}>
                     <span

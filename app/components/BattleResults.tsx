@@ -3,74 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
-
-type BadgeKey =
-  | "champion"
-  | "top_10"
-  | "perfect_record"
-  | "hot_streak"
-  | "veteran"
-  | "ranked_regular"
-  | "rising_producer"
-  | "first_win";
-
-type BadgeMeta = {
-  icon: string;
-  label: string;
-  description: string;
-  tone: "champion" | "goat" | "perfect" | "fire" | "veteran" | "regular" | "rising" | "default";
-};
-
-const BADGE_CATALOG: Record<string, BadgeMeta> = {
-  champion: {
-    icon: "👑",
-    label: "Champion",
-    description: "Reached the #1 spot on the ranked leaderboard.",
-    tone: "champion",
-  },
-  top_10: {
-    icon: "🐐",
-    label: "Top 10",
-    description: "Reached the top 10 on the ranked leaderboard.",
-    tone: "goat",
-  },
-  perfect_record: {
-    icon: "🧊",
-    label: "Perfect Record",
-    description: "Held a 100% win rate with 3+ battles.",
-    tone: "perfect",
-  },
-  hot_streak: {
-    icon: "🔥",
-    label: "Hot Streak",
-    description: "Won 3 battles in a row.",
-    tone: "fire",
-  },
-  veteran: {
-    icon: "🎧",
-    label: "Veteran",
-    description: "Played 10 ranked battles.",
-    tone: "veteran",
-  },
-  ranked_regular: {
-    icon: "💿",
-    label: "Ranked Regular",
-    description: "Played 5 ranked battles.",
-    tone: "regular",
-  },
-  rising_producer: {
-    icon: "⚡",
-    label: "Rising Producer",
-    description: "Reached 50 rating.",
-    tone: "rising",
-  },
-  first_win: {
-    icon: "🥇",
-    label: "First Win",
-    description: "Won your first ranked battle.",
-    tone: "champion",
-  },
-};
+import { BadgeIcon, getBadgeMeta } from "../../lib/badges";
 
 type ResultRow = {
   user_id: string;
@@ -116,81 +49,6 @@ function getPodiumClass(place: number): string {
   if (place === 2) return "podium-card podium-card-second";
   if (place === 3) return "podium-card podium-card-third";
   return "podium-card";
-}
-
-function getBadgeMeta(key: string | null | undefined): BadgeMeta {
-  if (key && BADGE_CATALOG[key]) return BADGE_CATALOG[key];
-
-  return {
-    icon: "🎛️",
-    label: "Producer",
-    description: "Default producer badge.",
-    tone: "default",
-  };
-}
-
-function getBadgeStyle(tone: BadgeMeta["tone"]): React.CSSProperties {
-  const base: React.CSSProperties = {
-    width: 34,
-    height: 34,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(255,255,255,0.05)",
-    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.025)",
-    fontSize: "1rem",
-    flexShrink: 0,
-  };
-
-  switch (tone) {
-    case "champion":
-      return {
-        ...base,
-        border: "1px solid rgba(246,198,91,0.46)",
-        background:
-          "radial-gradient(circle at 30% 20%, rgba(246,198,91,0.28), rgba(255,77,28,0.1))",
-      };
-    case "goat":
-      return {
-        ...base,
-        border: "1px solid rgba(255,116,67,0.36)",
-        background: "rgba(255,77,28,0.09)",
-      };
-    case "perfect":
-      return {
-        ...base,
-        border: "1px solid rgba(186,230,253,0.36)",
-        background: "rgba(14,165,233,0.09)",
-      };
-    case "fire":
-      return {
-        ...base,
-        border: "1px solid rgba(255,77,28,0.42)",
-        background: "rgba(255,77,28,0.11)",
-      };
-    case "veteran":
-      return {
-        ...base,
-        border: "1px solid rgba(209,213,219,0.26)",
-        background: "rgba(209,213,219,0.07)",
-      };
-    case "regular":
-      return {
-        ...base,
-        border: "1px solid rgba(246,198,91,0.3)",
-        background: "rgba(246,198,91,0.075)",
-      };
-    case "rising":
-      return {
-        ...base,
-        border: "1px solid rgba(140,255,107,0.3)",
-        background: "rgba(140,255,107,0.07)",
-      };
-    default:
-      return base;
-  }
 }
 
 export default function BattleResults({ battleId }: BattleResultsProps) {
@@ -479,7 +337,7 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
                     borderRadius: 16,
                   }}
                 >
-                  <span style={getBadgeStyle(badge.tone)}>{badge.icon}</span>
+                  <BadgeIcon badgeKey={unlock.badge_key} size={34} />
 
                   <div style={{ minWidth: 0 }}>
                     <p
@@ -564,9 +422,7 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
                   >
                     <div className="podium-place-badge">{getOrdinal(actualPlace)}</div>
                     <div className="podium-name-row">
-                      <span style={getBadgeStyle(badge.tone)} title={badge.label}>
-                        {badge.icon}
-                      </span>
+                      <BadgeIcon badgeKey={row.selectedBadgeKey} size={34} />
                       <h4>{name}</h4>
                       {isWinner && <span className="podium-winner-pill">Winner</span>}
                     </div>
@@ -634,9 +490,7 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
                             }}
                           >
                             {isWinner ? "🏆" : ""}
-                            <span style={getBadgeStyle(badge.tone)} title={badge.label}>
-                              {badge.icon}
-                            </span>
+                            <BadgeIcon badgeKey={row.selectedBadgeKey} size={34} />
                             {name}
                           </h4>
                           <p>

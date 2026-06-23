@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
+import { BadgeIcon, getBadgeMeta } from "../../lib/badges";
 
 type LeaderProfile = {
   id: string;
@@ -11,63 +12,6 @@ type LeaderProfile = {
   total_battles: number | null;
   win_rate: number | null;
   selected_badge_key: string | null;
-};
-
-type BadgeMeta = {
-  icon: string;
-  label: string;
-  tone:
-    | "champion"
-    | "fire"
-    | "goat"
-    | "veteran"
-    | "perfect"
-    | "rising"
-    | "regular"
-    | "default";
-};
-
-const BADGE_CATALOG: Record<string, BadgeMeta> = {
-  champion: {
-    icon: "👑",
-    label: "Champion",
-    tone: "champion",
-  },
-  top_10: {
-    icon: "🐐",
-    label: "Top 10",
-    tone: "goat",
-  },
-  perfect_record: {
-    icon: "🧊",
-    label: "Perfect Record",
-    tone: "perfect",
-  },
-  hot_streak: {
-    icon: "🔥",
-    label: "Hot Streak",
-    tone: "fire",
-  },
-  veteran: {
-    icon: "🎧",
-    label: "Veteran",
-    tone: "veteran",
-  },
-  ranked_regular: {
-    icon: "💿",
-    label: "Ranked Regular",
-    tone: "regular",
-  },
-  rising_producer: {
-    icon: "⚡",
-    label: "Rising Producer",
-    tone: "rising",
-  },
-  first_win: {
-    icon: "🥇",
-    label: "First Win",
-    tone: "champion",
-  },
 };
 
 function getRankFromRating(rating: number | null | undefined): string {
@@ -145,82 +89,6 @@ function getRankTheme(rank: string) {
 
 function getDisplayName(player: LeaderProfile): string {
   return player.display_name || `Producer ${player.id.slice(0, 6).toUpperCase()}`;
-}
-
-function getStoredBadge(player: LeaderProfile): BadgeMeta {
-  if (player.selected_badge_key && BADGE_CATALOG[player.selected_badge_key]) {
-    return BADGE_CATALOG[player.selected_badge_key];
-  }
-
-  return {
-    icon: "🎛️",
-    label: "Producer",
-    tone: "default",
-  };
-}
-
-function getBadgeStyle(tone: BadgeMeta["tone"]): React.CSSProperties {
-  const base: React.CSSProperties = {
-    width: 34,
-    height: 34,
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(255,255,255,0.05)",
-    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.025)",
-    fontSize: "1rem",
-    flexShrink: 0,
-  };
-
-  switch (tone) {
-    case "champion":
-      return {
-        ...base,
-        border: "1px solid rgba(246,198,91,0.46)",
-        background:
-          "radial-gradient(circle at 30% 20%, rgba(246,198,91,0.28), rgba(255,77,28,0.1))",
-      };
-    case "fire":
-      return {
-        ...base,
-        border: "1px solid rgba(255,77,28,0.42)",
-        background: "rgba(255,77,28,0.11)",
-      };
-    case "goat":
-      return {
-        ...base,
-        border: "1px solid rgba(255,116,67,0.36)",
-        background: "rgba(255,77,28,0.09)",
-      };
-    case "perfect":
-      return {
-        ...base,
-        border: "1px solid rgba(186,230,253,0.36)",
-        background: "rgba(14,165,233,0.09)",
-      };
-    case "veteran":
-      return {
-        ...base,
-        border: "1px solid rgba(209,213,219,0.26)",
-        background: "rgba(209,213,219,0.07)",
-      };
-    case "regular":
-      return {
-        ...base,
-        border: "1px solid rgba(246,198,91,0.3)",
-        background: "rgba(246,198,91,0.075)",
-      };
-    case "rising":
-      return {
-        ...base,
-        border: "1px solid rgba(140,255,107,0.3)",
-        background: "rgba(140,255,107,0.07)",
-      };
-    default:
-      return base;
-  }
 }
 
 export default function LeaderboardPage() {
@@ -418,15 +286,7 @@ export default function LeaderboardPage() {
                 minWidth: 0,
               }}
             >
-              {(() => {
-                const badge = getStoredBadge(currentUser.player);
-
-                return (
-                  <span style={getBadgeStyle(badge.tone)} title={badge.label}>
-                    {badge.icon}
-                  </span>
-                );
-              })()}
+              <BadgeIcon badgeKey={currentUser.player.selected_badge_key} size={34} />
 
               <div style={{ minWidth: 0 }}>
                 <div
@@ -500,7 +360,7 @@ export default function LeaderboardPage() {
           >
             {podiumRows.map((player, idx) => {
               const rank = idx + 1;
-              const badge = getStoredBadge(player);
+              const badge = getBadgeMeta(player.selected_badge_key);
               const isChampion = rank === 1;
 
               return (
@@ -577,9 +437,7 @@ export default function LeaderboardPage() {
                       #{rank}
                     </span>
 
-                    <span style={getBadgeStyle(badge.tone)} title={badge.label}>
-                      {badge.icon}
-                    </span>
+                    <BadgeIcon badgeKey={player.selected_badge_key} size={34} />
                   </div>
 
                   <div style={{ position: "relative", zIndex: 1 }}>
@@ -759,7 +617,6 @@ export default function LeaderboardPage() {
                       !searching && leaderboardRank <= 10 ? "Top 10" : ratingRank;
 
                     const rankTheme = getRankTheme(displayRank);
-                    const badge = getStoredBadge(p);
                     const name = getDisplayName(p);
                     const isCurrentUser = p.id === currentUserId;
 
@@ -824,9 +681,7 @@ export default function LeaderboardPage() {
                               {displayRank}
                             </span>
 
-                            <span style={getBadgeStyle(badge.tone)} title={badge.label}>
-                              {badge.icon}
-                            </span>
+                            <BadgeIcon badgeKey={p.selected_badge_key} size={34} />
 
                             <span
                               style={{

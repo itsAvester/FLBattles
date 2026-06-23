@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
-import { BadgeIcon, getBadgeMeta } from "../../lib/badges";
+import { BadgeIcon } from "../../lib/badges";
 
-type LeaderProfile = {
+type LeaderRow = {
   id: string;
   display_name: string | null;
   rating: number | null;
   total_battles: number | null;
   win_rate: number | null;
+  wins?: number | null;
+  losses?: number | null;
   selected_badge_key: string | null;
 };
+
+type BoardKind = "season" | "allTime";
 
 function getRankFromRating(rating: number | null | undefined): string {
   const r = rating ?? 0;
@@ -29,6 +33,8 @@ function getRankFromRating(rating: number | null | undefined): string {
 
 function getRankTheme(rank: string) {
   switch (rank) {
+    case "Champion":
+    case "Season Champion":
     case "Top 10":
       return {
         text: "#1b120d",
@@ -87,12 +93,38 @@ function getRankTheme(rank: string) {
   }
 }
 
-function getDisplayName(player: LeaderProfile): string {
+function getDisplayName(player: LeaderRow): string {
   return player.display_name || `Producer ${player.id.slice(0, 6).toUpperCase()}`;
 }
 
+function getSeasonInfo() {
+  const now = new Date();
+  const nextSeason = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const daysRemaining = Math.max(
+    1,
+    Math.ceil((nextSeason.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  );
+
+  return {
+    label: now.toLocaleDateString(undefined, {
+      month: "long",
+      year: "numeric",
+    }),
+    daysRemaining,
+  };
+}
+
+function formatRating(r: number | null) {
+  return r === null ? "Unranked" : Math.round(r);
+}
+
+function formatWinRate(w: number | null) {
+  return w === null ? "—" : `${Number(w).toFixed(1)}%`;
+}
+
 export default function LeaderboardPage() {
-  const [rows, setRows] = useState<LeaderProfile[]>([]);
+  const [seasonRows, setSeasonRows] = useState<LeaderRow[]>([]);
+  const [allTimeRows, setAllTimeRows] = useState<LeaderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -100,36 +132,54 @@ export default function LeaderboardPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searching, setSearching] = useState(false);
 
-  const loadProfiles = async (term?: string) => {
+  const season = useMemo(() => getSeasonInfo(), []);
+
+  const loadLeaderboards = async (term?: string) => {
     const cleanTerm = term?.trim() ?? "";
 
     setLoading(true);
     setErrorMsg(null);
 
-    let query = supabase
-      .from("profiles")
-      .select("id, display_name, rating, total_battles, win_rate, selected_badge_key")
+    let seasonQuery = supabase
+      .from("current_season_leaderboard")
+      .select("id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key")
       .order("rating", { ascending: false })
+      .order("wins", { ascending: false })
+      .order("total_battles", { ascending: false })
+      .limit(100);
+
+    let allTimeQuery = supabase
+      .from("profiles")
+      .select("id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key")
+      .gt("total_battles", 0)
+      .order("rating", { ascending: false })
+      .order("total_battles", { ascending: false })
       .limit(100);
 
     if (cleanTerm) {
-      query = query.ilike("display_name", `%${cleanTerm}%`);
+      seasonQuery = seasonQuery.ilike("display_name", `%${cleanTerm}%`);
+      allTimeQuery = allTimeQuery.ilike("display_name", `%${cleanTerm}%`);
     }
 
-    const { data, error } = await query;
+    const [seasonResult, allTimeResult] = await Promise.all([
+      seasonQuery,
+      allTimeQuery,
+    ]);
 
-    if (error) {
-      setErrorMsg(error.message);
-      setRows([]);
+    if (seasonResult.error || allTimeResult.error) {
+      setErrorMsg(seasonResult.error?.message || allTimeResult.error?.message || "Unable to load leaderboard.");
+      setSeasonRows([]);
+      setAllTimeRows([]);
     } else {
-      setRows(data ?? []);
+      setSeasonRows((seasonResult.data ?? []) as LeaderRow[]);
+      setAllTimeRows((allTimeResult.data ?? []) as LeaderRow[]);
     }
 
     setLoading(false);
   };
 
   useEffect(() => {
-    loadProfiles();
+    loadLeaderboards();
 
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
@@ -139,589 +189,400 @@ export default function LeaderboardPage() {
     loadUser();
   }, []);
 
-  const formatRating = (r: number | null) =>
-    r === null ? "Unranked" : Math.round(r);
-
-  const formatWinRate = (w: number | null) =>
-    w === null ? "—" : `${w.toFixed(1)}%`;
-
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
 
     const term = searchTerm.trim();
     setSearching(!!term);
-    await loadProfiles(term);
+    await loadLeaderboards(term);
   };
 
+  const clearSearch = async () => {
+    setSearchTerm("");
+    setSearching(false);
+    await loadLeaderboards();
+  };
+
+  const currentSeasonRank = !searching
+    ? seasonRows.findIndex((player) => player.id === currentUserId)
+    : -1;
+
+  const currentSeasonUser =
+    currentSeasonRank >= 0
+      ? {
+          player: seasonRows[currentSeasonRank],
+          rank: currentSeasonRank + 1,
+        }
+      : null;
+
+  const nextSeasonTarget =
+    currentSeasonUser && currentSeasonUser.rank > 1
+      ? seasonRows[currentSeasonUser.rank - 2]
+      : null;
+
+  const pointsToNext =
+    currentSeasonUser && nextSeasonTarget
+      ? Math.max(0, Math.round((nextSeasonTarget.rating ?? 0) - (currentSeasonUser.player.rating ?? 0)))
+      : 0;
+
+  return (
+    <section className="page-inner leaderboard-page">
+      <div className="leaderboard-shell">
+        <header className="leaderboard-hero">
+          <div>
+            <div className="eyebrow leaderboard-eyebrow">
+              <span className="eyebrow-dot" />
+              Ranked seasons
+            </div>
+
+            <h1>Leaderboard</h1>
+
+            <p className="page-description leaderboard-hero-copy">
+              Compete in the current monthly season, climb the board, and keep
+              your long-term legacy alive in the all-time Hall of Fame.
+            </p>
+          </div>
+
+          <div className="leaderboard-hero-stats" aria-label="Leaderboard summary">
+            <StatTile label="Current season" value={season.label} />
+            <StatTile label="Season resets in" value={`${season.daysRemaining}d`} />
+            <StatTile label="All-time pool" value={loading ? "—" : allTimeRows.length} />
+          </div>
+        </header>
+
+        <section className="season-banner">
+          <div>
+            <span className="season-banner-kicker">Current Season</span>
+            <strong>{season.label} Season</strong>
+            <p>
+              Monthly rankings reset at the start of each month. All-time stats
+              stay permanent underneath.
+            </p>
+          </div>
+
+          <Link href="/battles" className="btn-primary season-banner-button">
+            Enter Ranked Battle
+          </Link>
+        </section>
+
+        {currentSeasonUser && (
+          <section className="your-season-card">
+            <div className="your-season-card-main">
+              <BadgeIcon badgeKey={currentSeasonUser.player.selected_badge_key} size={34} />
+
+              <div>
+                <span>Your season rank</span>
+                <strong>
+                  #{currentSeasonUser.rank} {getDisplayName(currentSeasonUser.player)}
+                </strong>
+                <p>
+                  {formatRating(currentSeasonUser.player.rating)} season points ·{" "}
+                  {formatWinRate(currentSeasonUser.player.win_rate)} WR
+                </p>
+              </div>
+            </div>
+
+            <div className="your-season-card-side">
+              {currentSeasonUser.rank === 1
+                ? "You are leading the current season."
+                : `${pointsToNext} points away from #${currentSeasonUser.rank - 1}`}
+            </div>
+          </section>
+        )}
+
+        <form onSubmit={handleSearch} className="leaderboard-search">
+          <input
+            type="text"
+            placeholder="Search players by name."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+
+          <button type="submit" className="btn-secondary">
+            {loading && searching ? "Searching..." : "Search"}
+          </button>
+
+          {searching && (
+            <button type="button" className="btn-secondary" onClick={clearSearch}>
+              Clear
+            </button>
+          )}
+        </form>
+
+        {errorMsg && !loading && (
+          <div className="leaderboard-message leaderboard-message-error">
+            {errorMsg}
+          </div>
+        )}
+
+        <LeaderboardBoard
+          kind="season"
+          title="Current Season"
+          eyebrow={`${season.label} Season`}
+          description="This is the board players can realistically attack right now. Wins this month build season points without erasing all-time legacy."
+          rows={seasonRows}
+          loading={loading}
+          searching={searching}
+          currentUserId={currentUserId}
+          emptyMessage={
+            searching
+              ? "No current-season players matched that search."
+              : "No ranked battles have been counted for this season yet."
+          }
+        />
+
+        <section className="leaderboard-cta-strip">
+          <Link href="/battles" className="btn-primary">
+            Enter Ranked Battle
+          </Link>
+        </section>
+
+        <LeaderboardBoard
+          kind="allTime"
+          title="All-Time Hall of Fame"
+          eyebrow="Permanent leaderboard"
+          description="The long-term board for producers with the strongest ranked record across every season."
+          rows={allTimeRows}
+          loading={loading}
+          searching={searching}
+          currentUserId={currentUserId}
+          emptyMessage={
+            searching
+              ? "No all-time players matched that search."
+              : "No all-time ranked players found."
+          }
+        />
+      </div>
+    </section>
+  );
+}
+
+function LeaderboardBoard({
+  kind,
+  title,
+  eyebrow,
+  description,
+  rows,
+  loading,
+  searching,
+  currentUserId,
+  emptyMessage,
+}: {
+  kind: BoardKind;
+  title: string;
+  eyebrow: string;
+  description: string;
+  rows: LeaderRow[];
+  loading: boolean;
+  searching: boolean;
+  currentUserId: string | null;
+  emptyMessage: string;
+}) {
   const rankedRows = useMemo(() => rows, [rows]);
   const podiumRows = !searching ? rankedRows.slice(0, 3) : [];
   const tableRows = !searching ? rankedRows.slice(3) : rankedRows;
 
-  const currentUserIndex = !searching
-    ? rows.findIndex((player) => player.id === currentUserId)
-    : -1;
-
-  const currentUser =
-    currentUserIndex >= 0
-      ? {
-          player: rows[currentUserIndex],
-          rank: currentUserIndex + 1,
-        }
-      : null;
-
-  const nextTarget =
-    currentUser && currentUser.rank > 1
-      ? rows[currentUser.rank - 2]
-      : null;
-
-  const pointsToNext =
-    currentUser && nextTarget
-      ? Math.max(0, Math.round((nextTarget.rating ?? 0) - (currentUser.player.rating ?? 0)))
-      : 0;
-
   return (
-    <section className="page-inner" style={{ paddingTop: 42, paddingBottom: 96 }}>
-      <div
-        style={{
-          display: "grid",
-          gap: 22,
-          maxWidth: 1280,
-          margin: "0 auto",
-        }}
-      >
-        <header
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) auto",
-            gap: 24,
-            alignItems: "end",
-          }}
-        >
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>
-              <span className="eyebrow-dot" />
-              Ranked producers
-            </div>
+    <section className={`leaderboard-board leaderboard-board-${kind}`}>
+      <div className="leaderboard-section-head">
+        <div>
+          <span>{eyebrow}</span>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
 
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "clamp(2.55rem, 5vw, 5.2rem)",
-                lineHeight: 0.88,
-                letterSpacing: "-0.075em",
-                fontWeight: 900,
-                color: "var(--text)",
-              }}
-            >
-              Leaderboard
-            </h1>
-
-            <p
-              className="page-description"
-              style={{
-                maxWidth: 690,
-                marginTop: 16,
-                color: "rgba(255,255,255,0.6)",
-                fontSize: "1rem",
-                lineHeight: 1.65,
-              }}
-            >
-              Climb the ranked board, earn status icons, and prove your beats
-              belong near the top.
-            </p>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gap: 8,
-              justifyItems: "end",
-              minWidth: 190,
-            }}
-          >
-            <span
-              style={{
-                color: "rgba(255,255,255,0.38)",
-                fontSize: "0.68rem",
-                fontWeight: 950,
-                textTransform: "uppercase",
-                letterSpacing: "0.14em",
-              }}
-            >
-              Ranked pool
-            </span>
-            <strong
-              style={{
-                color: "var(--text)",
-                fontSize: "clamp(1.5rem, 3vw, 2.2rem)",
-                lineHeight: 1,
-                letterSpacing: "-0.05em",
-              }}
-            >
-              {loading ? "—" : rows.length}
-            </strong>
-          </div>
-        </header>
-
-        {currentUser && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) auto",
-              gap: 16,
-              alignItems: "center",
-              padding: 16,
-              border: "1px solid rgba(140,255,107,0.22)",
-              background:
-                "linear-gradient(90deg, rgba(140,255,107,0.075), rgba(255,255,255,0.025), rgba(255,77,28,0.055))",
-              boxShadow: "0 22px 70px rgba(0,0,0,0.22)",
-              borderRadius: 18,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                minWidth: 0,
-              }}
-            >
-              <BadgeIcon badgeKey={currentUser.player.selected_badge_key} size={34} />
-
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    color: "rgba(255,255,255,0.42)",
-                    fontSize: "0.68rem",
-                    fontWeight: 950,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.14em",
-                    marginBottom: 5,
-                  }}
-                >
-                  Your rank
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: 10,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <strong
-                    style={{
-                      color: "var(--text)",
-                      fontSize: "1.15rem",
-                      letterSpacing: "-0.03em",
-                    }}
-                  >
-                    #{currentUser.rank} {getDisplayName(currentUser.player)}
-                  </strong>
-
-                  <span
-                    style={{
-                      color: "rgba(255,255,255,0.56)",
-                      fontSize: "0.88rem",
-                      fontWeight: 750,
-                    }}
-                  >
-                    {formatRating(currentUser.player.rating)} rating ·{" "}
-                    {formatWinRate(currentUser.player.win_rate)} WR
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div
-              style={{
-                color: "rgba(255,255,255,0.62)",
-                fontSize: "0.84rem",
-                fontWeight: 800,
-                textAlign: "right",
-                lineHeight: 1.4,
-              }}
-            >
-              {currentUser.rank === 1
-                ? "You are holding the #1 spot."
-                : `${pointsToNext} rating away from #${currentUser.rank - 1}`}
-            </div>
-          </div>
-        )}
-
-        {!loading && !errorMsg && podiumRows.length > 0 && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-              gap: 14,
-            }}
-          >
-            {podiumRows.map((player, idx) => {
-              const rank = idx + 1;
-              const badge = getBadgeMeta(player.selected_badge_key);
-              const isChampion = rank === 1;
-
-              return (
-                <Link
-                  key={player.id}
-                  href={`/players/${player.id}`}
-                  style={{
-                    position: "relative",
-                    overflow: "hidden",
-                    minHeight: isChampion ? 206 : 178,
-                    display: "grid",
-                    alignContent: "space-between",
-                    padding: isChampion ? 22 : 18,
-                    borderRadius: 22,
-                    border: isChampion
-                      ? "1px solid rgba(246,198,91,0.34)"
-                      : "1px solid rgba(255,255,255,0.1)",
-                    background: isChampion
-                      ? "radial-gradient(circle at 20% 0%, rgba(246,198,91,0.18), transparent 36%), radial-gradient(circle at 90% 0%, rgba(255,77,28,0.18), transparent 38%), rgba(255,255,255,0.045)"
-                      : "linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018))",
-                    boxShadow: isChampion
-                      ? "0 28px 90px rgba(0,0,0,0.34), 0 0 50px rgba(255,77,28,0.08)"
-                      : "0 22px 70px rgba(0,0,0,0.25)",
-                    textDecoration: "none",
-                    color: "var(--text)",
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      right: -12,
-                      top: -20,
-                      color: "rgba(255,255,255,0.045)",
-                      fontSize: isChampion ? "7rem" : "5.6rem",
-                      fontWeight: 950,
-                      letterSpacing: "-0.09em",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {rank}
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      gap: 14,
-                      position: "relative",
-                      zIndex: 1,
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        minHeight: 28,
-                        padding: "0 10px",
-                        borderRadius: 999,
-                        border: isChampion
-                          ? "1px solid rgba(246,198,91,0.48)"
-                          : "1px solid rgba(255,255,255,0.14)",
-                        background: isChampion
-                          ? "rgba(246,198,91,0.1)"
-                          : "rgba(255,255,255,0.04)",
-                        color: isChampion ? "#fde68a" : "rgba(255,255,255,0.72)",
-                        fontSize: "0.66rem",
-                        fontWeight: 950,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.12em",
-                      }}
-                    >
-                      #{rank}
-                    </span>
-
-                    <BadgeIcon badgeKey={player.selected_badge_key} size={34} />
-                  </div>
-
-                  <div style={{ position: "relative", zIndex: 1 }}>
-                    <div
-                      style={{
-                        color: "rgba(255,255,255,0.42)",
-                        fontSize: "0.68rem",
-                        fontWeight: 950,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.14em",
-                        marginBottom: 8,
-                      }}
-                    >
-                      {badge.label}
-                    </div>
-
-                    <h2
-                      style={{
-                        margin: 0,
-                        color: "var(--text)",
-                        fontSize: isChampion ? "1.45rem" : "1.15rem",
-                        lineHeight: 1.08,
-                        letterSpacing: "-0.045em",
-                        fontWeight: 920,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {getDisplayName(player)}
-                    </h2>
-
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(3, 1fr)",
-                        gap: 10,
-                        marginTop: 18,
-                      }}
-                    >
-                      <MiniStat label="Rating" value={formatRating(player.rating)} />
-                      <MiniStat label="WR" value={formatWinRate(player.win_rate)} />
-                      <MiniStat label="Battles" value={player.total_battles ?? 0} />
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
-        <form
-          onSubmit={handleSearch}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto",
-            gap: 10,
-            alignItems: "center",
-            padding: 10,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(255,255,255,0.035)",
-            boxShadow: "0 18px 70px rgba(0,0,0,0.22)",
-            borderRadius: 18,
-          }}
-        >
-          <input
-            type="text"
-            placeholder="Search players by name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: "100%",
-              minHeight: 46,
-              padding: "13px 14px",
-              border: "1px solid rgba(255,255,255,0.08)",
-              background: "rgba(5, 5, 5, 0.55)",
-              color: "var(--text)",
-              outline: "none",
-              fontSize: "0.95rem",
-              fontWeight: 650,
-              borderRadius: 12,
-            }}
-          />
-
-          <button
-            type="submit"
-            className="btn-secondary"
-            style={{
-              minHeight: 46,
-              paddingInline: 22,
-              borderRadius: 12,
-            }}
-          >
-            {loading && searching ? "Searching..." : "Search"}
-          </button>
-        </form>
-
-        <div
-          style={{
-            border: "1px solid rgba(255,255,255,0.08)",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018))",
-            overflow: "hidden",
-            boxShadow: "0 28px 90px rgba(0,0,0,0.28)",
-            borderRadius: 22,
-          }}
-        >
-          {loading && (
-            <p
-              style={{
-                margin: 0,
-                padding: "22px",
-                color: "rgba(255,255,255,0.58)",
-                fontWeight: 750,
-              }}
-            >
-              {searching ? "Searching players..." : "Loading leaderboard..."}
-            </p>
-          )}
-
-          {errorMsg && !loading && (
-            <p
-              style={{
-                margin: 0,
-                padding: "22px",
-                color: "#fca5a5",
-                fontWeight: 750,
-              }}
-            >
-              {errorMsg}
-            </p>
-          )}
-
-          {!loading && !errorMsg && rows.length === 0 && (
-            <p
-              style={{
-                margin: 0,
-                padding: "22px",
-                color: "rgba(255,255,255,0.58)",
-                fontWeight: 750,
-              }}
-            >
-              No ranked players found.
-            </p>
-          )}
-
-          {!loading && !errorMsg && rows.length > 0 && (
-            <div style={{ overflowX: "auto" }}>
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  minWidth: 900,
-                  fontSize: "0.94rem",
-                }}
-              >
-                <thead>
-                  <tr
-                    style={{
-                      background: "rgba(8, 12, 18, 0.76)",
-                      borderBottom: "1px solid rgba(255,255,255,0.08)",
-                    }}
-                  >
-                    <th style={thLeftStyle}>#</th>
-                    <th style={thLeftStyle}>Producer</th>
-                    <th style={thRightStyle}>Rating</th>
-                    <th style={thRightStyle}>Win Rate</th>
-                    <th style={thRightStyle}>Battles</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {tableRows.map((p, idx) => {
-                    const leaderboardRank = searching ? idx + 1 : idx + 4;
-                    const ratingRank = getRankFromRating(p.rating);
-                    const displayRank =
-                      !searching && leaderboardRank <= 10 ? "Top 10" : ratingRank;
-
-                    const rankTheme = getRankTheme(displayRank);
-                    const name = getDisplayName(p);
-                    const isCurrentUser = p.id === currentUserId;
-
-                    return (
-                      <tr
-                        key={p.id}
-                        style={{
-                          borderBottom: "1px solid rgba(255,255,255,0.045)",
-                          background: isCurrentUser
-                            ? "linear-gradient(90deg, rgba(140,255,107,0.08), rgba(255,255,255,0.015))"
-                            : leaderboardRank <= 10 && !searching
-                              ? "linear-gradient(90deg, rgba(255,77,28,0.04), rgba(255,255,255,0.012))"
-                              : "transparent",
-                        }}
-                      >
-                        <td
-                          style={{
-                            padding: "14px 18px",
-                            color: isCurrentUser
-                              ? "rgba(140,255,107,0.9)"
-                              : "rgba(255,255,255,0.62)",
-                            fontWeight: 900,
-                            width: 72,
-                          }}
-                        >
-                          {leaderboardRank}
-                        </td>
-
-                        <td style={{ padding: "14px 18px" }}>
-                          <Link
-                            href={`/players/${p.id}`}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 12,
-                              textDecoration: "none",
-                              color: "var(--text)",
-                              fontWeight: 840,
-                              letterSpacing: "-0.018em",
-                              maxWidth: "100%",
-                            }}
-                          >
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                minWidth: 70,
-                                padding: "7px 10px",
-                                border: `1px solid ${rankTheme.border}`,
-                                background: rankTheme.background,
-                                color: rankTheme.text,
-                                fontSize: "0.66rem",
-                                fontWeight: 950,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.075em",
-                                lineHeight: 1,
-                                whiteSpace: "nowrap",
-                                borderRadius: 10,
-                              }}
-                            >
-                              {displayRank}
-                            </span>
-
-                            <BadgeIcon badgeKey={p.selected_badge_key} size={34} />
-
-                            <span
-                              style={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {name}
-                              {isCurrentUser && (
-                                <span
-                                  style={{
-                                    marginLeft: 8,
-                                    color: "rgba(140,255,107,0.75)",
-                                    fontSize: "0.72rem",
-                                    fontWeight: 950,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.1em",
-                                  }}
-                                >
-                                  You
-                                </span>
-                              )}
-                            </span>
-                          </Link>
-                        </td>
-
-                        <td style={tdRightStyle}>{formatRating(p.rating)}</td>
-                        <td style={tdRightStyle}>{formatWinRate(p.win_rate)}</td>
-                        <td style={tdRightStyle}>{p.total_battles ?? 0}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <div className="leaderboard-section-count">
+          <span>{kind === "season" ? "Season pool" : "Showing top"}</span>
+          <strong>{loading ? "—" : rows.length}</strong>
         </div>
       </div>
+
+      {!loading && podiumRows.length > 0 && (
+        <div className="leaderboard-podium-grid">
+          {podiumRows.map((player, idx) => (
+            <PodiumCard
+              key={`${kind}-${player.id}`}
+              player={player}
+              rank={idx + 1}
+              kind={kind}
+            />
+          ))}
+        </div>
+      )}
+
+      <LeaderboardTable
+        kind={kind}
+        rows={tableRows}
+        loading={loading}
+        currentUserId={currentUserId}
+        emptyMessage={emptyMessage}
+        startRank={!searching ? 4 : 1}
+      />
     </section>
+  );
+}
+
+function PodiumCard({
+  player,
+  rank,
+  kind,
+}: {
+  player: LeaderRow;
+  rank: number;
+  kind: BoardKind;
+}) {
+  const isChampion = rank === 1;
+  const statusLabel =
+    rank === 1
+      ? kind === "season"
+        ? "Season Champion"
+        : "Champion"
+      : rank <= 10
+        ? "Top 10"
+        : getRankFromRating(player.rating);
+
+  return (
+    <Link
+      href={`/players/${player.id}`}
+      className={`leaderboard-podium-card ${isChampion ? "leaderboard-podium-card-champion" : ""}`}
+    >
+      <div className="leaderboard-podium-bg-number">{rank}</div>
+
+      <div className="leaderboard-podium-topline">
+        <span className="leaderboard-rank-bubble">#{rank}</span>
+        <BadgeIcon badgeKey={player.selected_badge_key} size={34} />
+      </div>
+
+      <div className="leaderboard-podium-body">
+        <RankPill label={statusLabel} />
+
+        <h3>{getDisplayName(player)}</h3>
+
+        <div className="leaderboard-mini-stat-grid">
+          <MiniStat label={kind === "season" ? "Points" : "Rating"} value={formatRating(player.rating)} />
+          <MiniStat label="WR" value={formatWinRate(player.win_rate)} />
+          <MiniStat label="Battles" value={player.total_battles ?? 0} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function LeaderboardTable({
+  kind,
+  rows,
+  loading,
+  currentUserId,
+  emptyMessage,
+  startRank,
+}: {
+  kind: BoardKind;
+  rows: LeaderRow[];
+  loading: boolean;
+  currentUserId: string | null;
+  emptyMessage: string;
+  startRank: number;
+}) {
+  return (
+    <div className="leaderboard-table-card">
+      {loading && (
+        <p className="leaderboard-message">
+          Loading {kind === "season" ? "current season" : "all-time"} leaderboard...
+        </p>
+      )}
+
+      {!loading && rows.length === 0 && (
+        <p className="leaderboard-message">{emptyMessage}</p>
+      )}
+
+      {!loading && rows.length > 0 && (
+        <div className="leaderboard-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style={thLeftStyle}>#</th>
+                <th style={thLeftStyle}>Producer</th>
+                <th style={thRightStyle}>{kind === "season" ? "Points" : "Rating"}</th>
+                <th style={thRightStyle}>Win Rate</th>
+                <th style={thRightStyle}>Battles</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.map((player, idx) => {
+                const rank = startRank + idx;
+                const name = getDisplayName(player);
+                const isCurrentUser = player.id === currentUserId;
+                const rankLabel =
+                  rank === 1
+                    ? kind === "season"
+                      ? "Season Champion"
+                      : "Champion"
+                    : rank <= 10
+                      ? "Top 10"
+                      : getRankFromRating(player.rating);
+
+                return (
+                  <tr
+                    key={`${kind}-table-${player.id}`}
+                    className={isCurrentUser ? "leaderboard-current-user-row" : undefined}
+                  >
+                    <td style={tdLeftMutedStyle}>{rank}</td>
+
+                    <td style={tdNameStyle}>
+                      <Link href={`/players/${player.id}`} className="leaderboard-player-cell">
+                        <RankPill label={rankLabel} compact />
+                        <BadgeIcon badgeKey={player.selected_badge_key} size={28} />
+                        <span>
+                          {name}
+                          {isCurrentUser && <em>You</em>}
+                        </span>
+                      </Link>
+                    </td>
+
+                    <td style={tdRightStyle}>{formatRating(player.rating)}</td>
+                    <td style={tdRightStyle}>{formatWinRate(player.win_rate)}</td>
+                    <td style={tdRightStyle}>{player.total_battles ?? 0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatTile({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="leaderboard-stat-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function RankPill({
+  label,
+  compact = false,
+}: {
+  label: string;
+  compact?: boolean;
+}) {
+  const theme = getRankTheme(label);
+
+  return (
+    <span
+      className={compact ? "leaderboard-rank-pill leaderboard-rank-pill-compact" : "leaderboard-rank-pill"}
+      style={{
+        color: theme.text,
+        borderColor: theme.border,
+        background: theme.background,
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -733,47 +594,14 @@ function MiniStat({
   value: string | number;
 }) {
   return (
-    <div
-      style={{
-        padding: "10px 9px",
-        border: "1px solid rgba(255,255,255,0.08)",
-        background: "rgba(0,0,0,0.22)",
-        borderRadius: 12,
-        minWidth: 0,
-      }}
-    >
-      <div
-        style={{
-          color: "rgba(255,255,255,0.38)",
-          fontSize: "0.58rem",
-          fontWeight: 950,
-          textTransform: "uppercase",
-          letterSpacing: "0.12em",
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </div>
-
-      <strong
-        style={{
-          display: "block",
-          color: "rgba(255,255,255,0.88)",
-          fontSize: "0.94rem",
-          lineHeight: 1,
-          fontVariantNumeric: "tabular-nums",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {value}
-      </strong>
+    <div className="leaderboard-mini-stat">
+      <div>{label}</div>
+      <strong>{value}</strong>
     </div>
   );
 }
 
-const thLeftStyle: React.CSSProperties = {
+const thLeftStyle: CSSProperties = {
   textAlign: "left",
   padding: "14px 18px",
   color: "rgba(255,255,255,0.52)",
@@ -783,12 +611,26 @@ const thLeftStyle: React.CSSProperties = {
   letterSpacing: "0.13em",
 };
 
-const thRightStyle: React.CSSProperties = {
+const thRightStyle: CSSProperties = {
   ...thLeftStyle,
   textAlign: "right",
 };
 
-const tdRightStyle: React.CSSProperties = {
+const tdLeftMutedStyle: CSSProperties = {
+  padding: "14px 18px",
+  color: "rgba(255,255,255,0.56)",
+  fontWeight: 950,
+  fontVariantNumeric: "tabular-nums",
+};
+
+const tdNameStyle: CSSProperties = {
+  padding: "14px 18px",
+  color: "var(--text)",
+  fontWeight: 850,
+  minWidth: 280,
+};
+
+const tdRightStyle: CSSProperties = {
   padding: "14px 18px",
   textAlign: "right",
   color: "rgba(255,255,255,0.84)",

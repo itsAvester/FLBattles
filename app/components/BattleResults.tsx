@@ -4,12 +4,90 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
+type BadgeKey =
+  | "champion"
+  | "top_10"
+  | "perfect_record"
+  | "hot_streak"
+  | "veteran"
+  | "ranked_regular"
+  | "rising_producer"
+  | "first_win";
+
+type BadgeMeta = {
+  icon: string;
+  label: string;
+  description: string;
+  tone: "champion" | "goat" | "perfect" | "fire" | "veteran" | "regular" | "rising" | "default";
+};
+
+const BADGE_CATALOG: Record<string, BadgeMeta> = {
+  champion: {
+    icon: "👑",
+    label: "Champion",
+    description: "Reached the #1 spot on the ranked leaderboard.",
+    tone: "champion",
+  },
+  top_10: {
+    icon: "🐐",
+    label: "Top 10",
+    description: "Reached the top 10 on the ranked leaderboard.",
+    tone: "goat",
+  },
+  perfect_record: {
+    icon: "🧊",
+    label: "Perfect Record",
+    description: "Held a 100% win rate with 3+ battles.",
+    tone: "perfect",
+  },
+  hot_streak: {
+    icon: "🔥",
+    label: "Hot Streak",
+    description: "Won 3 battles in a row.",
+    tone: "fire",
+  },
+  veteran: {
+    icon: "🎧",
+    label: "Veteran",
+    description: "Played 10 ranked battles.",
+    tone: "veteran",
+  },
+  ranked_regular: {
+    icon: "💿",
+    label: "Ranked Regular",
+    description: "Played 5 ranked battles.",
+    tone: "regular",
+  },
+  rising_producer: {
+    icon: "⚡",
+    label: "Rising Producer",
+    description: "Reached 50 rating.",
+    tone: "rising",
+  },
+  first_win: {
+    icon: "🥇",
+    label: "First Win",
+    description: "Won your first ranked battle.",
+    tone: "champion",
+  },
+};
+
 type ResultRow = {
   user_id: string;
   audio_url: string;
   votes: number;
   isSelf: boolean;
   displayName: string;
+  selectedBadgeKey: string | null;
+};
+
+type BadgeUnlockRow = {
+  id: string;
+  user_id: string;
+  badge_key: string;
+  unlocked_at: string;
+  displayName: string;
+  isSelf: boolean;
 };
 
 type BattleResultsProps = {
@@ -40,9 +118,85 @@ function getPodiumClass(place: number): string {
   return "podium-card";
 }
 
+function getBadgeMeta(key: string | null | undefined): BadgeMeta {
+  if (key && BADGE_CATALOG[key]) return BADGE_CATALOG[key];
+
+  return {
+    icon: "🎛️",
+    label: "Producer",
+    description: "Default producer badge.",
+    tone: "default",
+  };
+}
+
+function getBadgeStyle(tone: BadgeMeta["tone"]): React.CSSProperties {
+  const base: React.CSSProperties = {
+    width: 34,
+    height: 34,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.05)",
+    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.025)",
+    fontSize: "1rem",
+    flexShrink: 0,
+  };
+
+  switch (tone) {
+    case "champion":
+      return {
+        ...base,
+        border: "1px solid rgba(246,198,91,0.46)",
+        background:
+          "radial-gradient(circle at 30% 20%, rgba(246,198,91,0.28), rgba(255,77,28,0.1))",
+      };
+    case "goat":
+      return {
+        ...base,
+        border: "1px solid rgba(255,116,67,0.36)",
+        background: "rgba(255,77,28,0.09)",
+      };
+    case "perfect":
+      return {
+        ...base,
+        border: "1px solid rgba(186,230,253,0.36)",
+        background: "rgba(14,165,233,0.09)",
+      };
+    case "fire":
+      return {
+        ...base,
+        border: "1px solid rgba(255,77,28,0.42)",
+        background: "rgba(255,77,28,0.11)",
+      };
+    case "veteran":
+      return {
+        ...base,
+        border: "1px solid rgba(209,213,219,0.26)",
+        background: "rgba(209,213,219,0.07)",
+      };
+    case "regular":
+      return {
+        ...base,
+        border: "1px solid rgba(246,198,91,0.3)",
+        background: "rgba(246,198,91,0.075)",
+      };
+    case "rising":
+      return {
+        ...base,
+        border: "1px solid rgba(140,255,107,0.3)",
+        background: "rgba(140,255,107,0.07)",
+      };
+    default:
+      return base;
+  }
+}
+
 export default function BattleResults({ battleId }: BattleResultsProps) {
   const router = useRouter();
   const [rows, setRows] = useState<ResultRow[]>([]);
+  const [badgeUnlocks, setBadgeUnlocks] = useState<BadgeUnlockRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [winnerUserId, setWinnerUserId] = useState<string | null>(null);
   const [lobby, setLobby] = useState<LobbyResult | null>(null);
@@ -99,29 +253,63 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
         return;
       }
 
-      const userIds = Array.from(
-        new Set((submissions ?? []).map((submission: any) => submission.user_id))
+      const { data: unlockRows, error: unlockError } = await supabase
+        .from("battle_badge_unlocks")
+        .select("id, user_id, badge_key, unlocked_at")
+        .eq("battle_id", battleId)
+        .order("unlocked_at", { ascending: true });
+
+      if (unlockError) {
+        console.error("Error loading badge unlocks:", unlockError);
+      }
+
+      const submissionUserIds = (submissions ?? []).map(
+        (submission: any) => submission.user_id
       );
 
-      let profileNameById = new Map<string, string>();
+      const unlockUserIds = (unlockRows ?? []).map((unlock: any) => unlock.user_id);
+
+      const userIds = Array.from(new Set([...submissionUserIds, ...unlockUserIds]));
+
+      let profileById = new Map<
+        string,
+        { displayName: string; selectedBadgeKey: string | null }
+      >();
 
       if (userIds.length > 0) {
         const { data: profilesData, error: profilesError } = await supabase
           .from("profiles")
-          .select("id, display_name")
+          .select("id, display_name, selected_badge_key")
           .in("id", userIds);
 
         if (profilesError) {
           console.error("Error loading result profiles:", profilesError);
         }
 
-        profileNameById = new Map(
+        profileById = new Map(
           (profilesData ?? []).map((profile: any) => [
             profile.id,
-            profile.display_name || "Unnamed Producer",
+            {
+              displayName: profile.display_name || "Unnamed Producer",
+              selectedBadgeKey: profile.selected_badge_key ?? null,
+            },
           ])
         );
       }
+
+      const formattedUnlocks: BadgeUnlockRow[] = (unlockRows ?? []).map(
+        (unlock: any) => ({
+          id: unlock.id,
+          user_id: unlock.user_id,
+          badge_key: unlock.badge_key,
+          unlocked_at: unlock.unlocked_at,
+          displayName:
+            profileById.get(unlock.user_id)?.displayName ?? "Unnamed Producer",
+          isSelf: currentUserId === unlock.user_id,
+        })
+      );
+
+      setBadgeUnlocks(formattedUnlocks);
 
       const voteCounts = new Map<string, number>();
       for (const vote of votes as any[]) {
@@ -129,20 +317,24 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
         voteCounts.set(key, (voteCounts.get(key) ?? 0) + 1);
       }
 
-      const resultRows: ResultRow[] = (submissions as any[]).map((submission, index) => {
-        const { data: urlData } = supabase.storage
-          .from("battle-audio")
-          .getPublicUrl(submission.audio_path);
+      const resultRows: ResultRow[] = (submissions as any[]).map(
+        (submission, index) => {
+          const { data: urlData } = supabase.storage
+            .from("battle-audio")
+            .getPublicUrl(submission.audio_path);
 
-        return {
-          user_id: submission.user_id,
-          audio_url: urlData.publicUrl,
-          votes: voteCounts.get(submission.user_id) ?? 0,
-          isSelf: currentUserId === submission.user_id,
-          displayName:
-            profileNameById.get(submission.user_id) ?? `Producer ${index + 1}`,
-        };
-      });
+          const profile = profileById.get(submission.user_id);
+
+          return {
+            user_id: submission.user_id,
+            audio_url: urlData.publicUrl,
+            votes: voteCounts.get(submission.user_id) ?? 0,
+            isSelf: currentUserId === submission.user_id,
+            displayName: profile?.displayName ?? `Producer ${index + 1}`,
+            selectedBadgeKey: profile?.selectedBadgeKey ?? null,
+          };
+        }
+      );
 
       resultRows.sort((a, b) => {
         if (b.votes !== a.votes) return b.votes - a.votes;
@@ -217,10 +409,10 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
               ? hasTieForFirst
                 ? "Top submissions were tied on votes. Final placement follows the saved battle result."
                 : isHostVote
-                ? `${winnerName} was selected by the host as the winner.`
-                : `${winnerName} took the battle with ${winner?.votes ?? 0} vote${
-                    winner?.votes === 1 ? "" : "s"
-                  }.`
+                  ? `${winnerName} was selected by the host as the winner.`
+                  : `${winnerName} took the battle with ${winner?.votes ?? 0} vote${
+                      winner?.votes === 1 ? "" : "s"
+                    }.`
               : "No submissions were recorded for this battle."}
           </p>
         </div>
@@ -243,6 +435,97 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
 
       {error && <div className="battle-results-error">{error}</div>}
 
+      {badgeUnlocks.length > 0 && (
+        <section
+          style={{
+            padding: "22px 28px",
+            borderBottom: "1px solid var(--line)",
+            background:
+              "radial-gradient(circle at 0% 0%, rgba(140,255,107,0.08), transparent 34%), rgba(255,255,255,0.012)",
+          }}
+        >
+          <div className="battle-results-section-header">
+            <div>
+              <span className="battle-results-eyebrow">Badge unlocks</span>
+              <h3>New achievements earned</h3>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+              gap: 12,
+              marginTop: 14,
+            }}
+          >
+            {badgeUnlocks.map((unlock) => {
+              const badge = getBadgeMeta(unlock.badge_key);
+
+              return (
+                <article
+                  key={unlock.id}
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "center",
+                    padding: 14,
+                    border: unlock.isSelf
+                      ? "1px solid rgba(140,255,107,0.34)"
+                      : "1px solid rgba(255,255,255,0.1)",
+                    background: unlock.isSelf
+                      ? "linear-gradient(90deg, rgba(140,255,107,0.09), rgba(255,255,255,0.025))"
+                      : "rgba(255,255,255,0.025)",
+                    borderRadius: 16,
+                  }}
+                >
+                  <span style={getBadgeStyle(badge.tone)}>{badge.icon}</span>
+
+                  <div style={{ minWidth: 0 }}>
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        color: "rgba(255,255,255,0.44)",
+                        fontSize: "0.64rem",
+                        fontWeight: 950,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.13em",
+                      }}
+                    >
+                      {unlock.isSelf ? "You unlocked" : `${unlock.displayName} unlocked`}
+                    </p>
+
+                    <strong
+                      style={{
+                        display: "block",
+                        color: "var(--text)",
+                        fontSize: "0.98rem",
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      {badge.label}
+                    </strong>
+
+                    <span
+                      style={{
+                        display: "block",
+                        marginTop: 4,
+                        color: "rgba(255,255,255,0.56)",
+                        fontSize: "0.78rem",
+                        fontWeight: 700,
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {badge.description}
+                    </span>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {rows.length === 0 ? (
         <div className="battle-results-empty">
           <h3>No submissions for this battle</h3>
@@ -264,10 +547,13 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
 
             <div className="battle-podium-grid">
               {podiumVisualOrder.map((row) => {
-                const actualPlace = rows.findIndex((r) => r.user_id === row.user_id) + 1;
-                const votePercent = totalVotes > 0 ? Math.round((row.votes / totalVotes) * 100) : 0;
+                const actualPlace =
+                  rows.findIndex((r) => r.user_id === row.user_id) + 1;
+                const votePercent =
+                  totalVotes > 0 ? Math.round((row.votes / totalVotes) * 100) : 0;
                 const name = row.isSelf ? "You" : row.displayName;
                 const isWinner = row.user_id === winner?.user_id;
+                const badge = getBadgeMeta(row.selectedBadgeKey);
 
                 return (
                   <article
@@ -278,6 +564,9 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
                   >
                     <div className="podium-place-badge">{getOrdinal(actualPlace)}</div>
                     <div className="podium-name-row">
+                      <span style={getBadgeStyle(badge.tone)} title={badge.label}>
+                        {badge.icon}
+                      </span>
                       <h4>{name}</h4>
                       {isWinner && <span className="podium-winner-pill">Winner</span>}
                     </div>
@@ -320,8 +609,10 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
               {rows.map((row, index) => {
                 const place = index + 1;
                 const name = row.isSelf ? "You" : row.displayName;
-                const votePercent = totalVotes > 0 ? Math.round((row.votes / totalVotes) * 100) : 0;
+                const votePercent =
+                  totalVotes > 0 ? Math.round((row.votes / totalVotes) * 100) : 0;
                 const isWinner = row.user_id === winner?.user_id;
+                const badge = getBadgeMeta(row.selectedBadgeKey);
 
                 return (
                   <article
@@ -334,8 +625,18 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
                       <div className="battle-result-rank-block">
                         <span className="battle-result-rank-number">#{place}</span>
                         <div>
-                          <h4>
-                            {isWinner ? "🏆 " : ""}
+                          <h4
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            {isWinner ? "🏆" : ""}
+                            <span style={getBadgeStyle(badge.tone)} title={badge.label}>
+                              {badge.icon}
+                            </span>
                             {name}
                           </h4>
                           <p>

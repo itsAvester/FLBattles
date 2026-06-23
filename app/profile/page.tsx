@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
@@ -15,6 +15,12 @@ type ProfileRow = {
   spotify_url: string | null;
   soundcloud_url: string | null;
   youtube_url: string | null;
+  selected_badge_key: string | null;
+};
+
+type UserBadgeRow = {
+  badge_key: string;
+  unlocked_at: string | null;
 };
 
 type SampleCounts = {
@@ -23,6 +29,171 @@ type SampleCounts = {
   rejected: number;
   total: number;
 };
+
+type BadgeMeta = {
+  key: string;
+  icon: string;
+  name: string;
+  description: string;
+  unlockText: string;
+  tone:
+    | "champion"
+    | "goat"
+    | "perfect"
+    | "fire"
+    | "veteran"
+    | "regular"
+    | "rising"
+    | "default";
+};
+
+const BADGE_CATALOG: BadgeMeta[] = [
+  {
+    key: "champion",
+    icon: "👑",
+    name: "Champion",
+    description: "The current king of the ranked ladder.",
+    unlockText: "Reach #1 on the leaderboard.",
+    tone: "champion",
+  },
+  {
+    key: "top_10",
+    icon: "🐐",
+    name: "Top 10",
+    description: "A visible mark for elite ranked producers.",
+    unlockText: "Reach the top 10 on the leaderboard.",
+    tone: "goat",
+  },
+  {
+    key: "perfect_record",
+    icon: "🧊",
+    name: "Perfect Record",
+    description: "Clean wins, no blemishes.",
+    unlockText: "Hold a 100% win rate with 3+ battles.",
+    tone: "perfect",
+  },
+  {
+    key: "hot_streak",
+    icon: "🔥",
+    name: "Hot Streak",
+    description: "For producers who are currently on a run.",
+    unlockText: "Coming soon: win 3 battles in a row.",
+    tone: "fire",
+  },
+  {
+    key: "veteran",
+    icon: "🎧",
+    name: "Veteran",
+    description: "Battle-tested and active.",
+    unlockText: "Play 10 ranked battles.",
+    tone: "veteran",
+  },
+  {
+    key: "ranked_regular",
+    icon: "💿",
+    name: "Ranked Regular",
+    description: "You are officially in the rotation.",
+    unlockText: "Play 5 ranked battles.",
+    tone: "regular",
+  },
+  {
+    key: "rising_producer",
+    icon: "⚡",
+    name: "Rising Producer",
+    description: "Momentum is building.",
+    unlockText: "Reach 50 rating.",
+    tone: "rising",
+  },
+  {
+    key: "first_win",
+    icon: "🥇",
+    name: "First Win",
+    description: "Your first ranked win on FL Battles.",
+    unlockText: "Win your first battle.",
+    tone: "champion",
+  },
+];
+
+function getBadgeByKey(key: string | null | undefined): BadgeMeta | null {
+  if (!key) return null;
+  return BADGE_CATALOG.find((badge) => badge.key === key) ?? null;
+}
+
+function getBadgeStyle(
+  tone: BadgeMeta["tone"],
+  options?: { locked?: boolean; selected?: boolean }
+): React.CSSProperties {
+  const locked = options?.locked ?? false;
+  const selected = options?.selected ?? false;
+
+  const base: React.CSSProperties = {
+    width: 44,
+    height: 44,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.05)",
+    boxShadow: selected
+      ? "0 0 0 3px rgba(140,255,107,0.12), inset 0 0 0 1px rgba(255,255,255,0.035)"
+      : "inset 0 0 0 1px rgba(255,255,255,0.025)",
+    fontSize: "1.2rem",
+    flexShrink: 0,
+    filter: locked ? "grayscale(1)" : "none",
+    opacity: locked ? 0.38 : 1,
+  };
+
+  if (locked) return base;
+
+  switch (tone) {
+    case "champion":
+      return {
+        ...base,
+        border: "1px solid rgba(246,198,91,0.48)",
+        background:
+          "radial-gradient(circle at 30% 20%, rgba(246,198,91,0.28), rgba(255,77,28,0.11))",
+      };
+    case "goat":
+      return {
+        ...base,
+        border: "1px solid rgba(255,116,67,0.38)",
+        background: "rgba(255,77,28,0.1)",
+      };
+    case "perfect":
+      return {
+        ...base,
+        border: "1px solid rgba(186,230,253,0.38)",
+        background: "rgba(14,165,233,0.1)",
+      };
+    case "fire":
+      return {
+        ...base,
+        border: "1px solid rgba(255,77,28,0.44)",
+        background: "rgba(255,77,28,0.12)",
+      };
+    case "veteran":
+      return {
+        ...base,
+        border: "1px solid rgba(209,213,219,0.28)",
+        background: "rgba(209,213,219,0.08)",
+      };
+    case "regular":
+      return {
+        ...base,
+        border: "1px solid rgba(246,198,91,0.32)",
+        background: "rgba(246,198,91,0.08)",
+      };
+    case "rising":
+      return {
+        ...base,
+        border: "1px solid rgba(140,255,107,0.32)",
+        background: "rgba(140,255,107,0.08)",
+      };
+    default:
+      return base;
+  }
+}
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -35,11 +206,14 @@ export default function ProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [badgeSaving, setBadgeSaving] = useState<string | null>(null);
+  const [badgeMessage, setBadgeMessage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [globalRank, setGlobalRank] = useState<number | null>(null);
   const [rankTier, setRankTier] = useState<RankTier>("Unranked");
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [unlockedBadges, setUnlockedBadges] = useState<UserBadgeRow[]>([]);
   const [sampleCounts, setSampleCounts] = useState<SampleCounts>({
     pending: 0,
     approved: 0,
@@ -74,7 +248,7 @@ export default function ProfilePage() {
       const { data, error } = await supabase
         .from("profiles")
         .select(
-          "id, display_name, total_battles, win_rate, rating, spotify_url, soundcloud_url, youtube_url"
+          "id, display_name, total_battles, win_rate, rating, spotify_url, soundcloud_url, youtube_url, selected_badge_key"
         )
         .eq("id", user.id)
         .single();
@@ -92,6 +266,18 @@ export default function ProfilePage() {
       setSpotifyUrl(profileRow.spotify_url ?? "");
       setSoundcloudUrl(profileRow.soundcloud_url ?? "");
       setYoutubeUrl(profileRow.youtube_url ?? "");
+
+      const { data: badgeRows, error: badgeError } = await supabase
+        .from("user_badges")
+        .select("badge_key, unlocked_at")
+        .eq("user_id", user.id)
+        .order("unlocked_at", { ascending: true });
+
+      if (!badgeError && badgeRows) {
+        setUnlockedBadges(badgeRows as UserBadgeRow[]);
+      } else if (badgeError) {
+        console.error("Failed to load user badges:", badgeError);
+      }
 
       let rank: number | null = null;
 
@@ -139,6 +325,55 @@ export default function ProfilePage() {
 
     loadProfile();
   }, [router]);
+
+  const unlockedBadgeKeys = useMemo(
+    () => new Set(unlockedBadges.map((badge) => badge.badge_key)),
+    [unlockedBadges]
+  );
+
+  const selectedBadge = getBadgeByKey(profile?.selected_badge_key);
+  const unlockedCount = unlockedBadges.length;
+
+  const handleSelectBadge = async (badge: BadgeMeta) => {
+    if (!profile) return;
+
+    const isUnlocked = unlockedBadgeKeys.has(badge.key);
+    const isSelected = profile.selected_badge_key === badge.key;
+
+    if (!isUnlocked || isSelected) return;
+
+    setBadgeSaving(badge.key);
+    setBadgeMessage(null);
+    setErrorMsg(null);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          selected_badge_key: badge.key,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", profile.id);
+
+      if (error) {
+        setErrorMsg(error.message || "Failed to select badge.");
+        return;
+      }
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              selected_badge_key: badge.key,
+            }
+          : prev
+      );
+
+      setBadgeMessage(`${badge.icon} ${badge.name} is now your display badge.`);
+    } finally {
+      setBadgeSaving(null);
+    }
+  };
 
   const handleSaveProfile = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -310,6 +545,224 @@ export default function ProfilePage() {
             <small>{stat.subtext}</small>
           </div>
         ))}
+      </div>
+
+      <div
+        className="card profile-card"
+        style={{
+          overflow: "hidden",
+          marginTop: 18,
+        }}
+      >
+        <div className="profile-card-header">
+          <p className="panel-label">Badge collection</p>
+          <span className="sample-badge">
+            {unlockedCount}/{BADGE_CATALOG.length} unlocked
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 1.1fr)",
+            gap: 18,
+            alignItems: "start",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          <div>
+            <h2>Choose your display icon</h2>
+
+            <p className="profile-card-copy">
+              Pick one unlocked badge to appear beside your name on the
+              leaderboard. Locked badges stay visible so you know what to chase
+              next.
+            </p>
+
+            <div
+              style={{
+                marginTop: 18,
+                padding: 16,
+                border: "1px solid rgba(255,255,255,0.1)",
+                background:
+                  "linear-gradient(90deg, rgba(255,77,28,0.08), rgba(255,255,255,0.025))",
+                borderRadius: 16,
+                display: "flex",
+                gap: 14,
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={getBadgeStyle(selectedBadge?.tone ?? "default", {
+                  selected: true,
+                })}
+              >
+                {selectedBadge?.icon ?? "🎛️"}
+              </span>
+
+              <div>
+                <p
+                  style={{
+                    margin: "0 0 5px",
+                    color: "rgba(255,255,255,0.42)",
+                    fontSize: "0.68rem",
+                    fontWeight: 950,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.14em",
+                  }}
+                >
+                  Current display badge
+                </p>
+
+                <strong
+                  style={{
+                    color: "var(--text)",
+                    fontSize: "1rem",
+                  }}
+                >
+                  {selectedBadge?.name ?? "Default Producer"}
+                </strong>
+              </div>
+            </div>
+
+            {badgeMessage && (
+              <p
+                style={{
+                  margin: "14px 0 0",
+                  color: "rgba(140,255,107,0.88)",
+                  fontWeight: 800,
+                  lineHeight: 1.5,
+                }}
+              >
+                {badgeMessage}
+              </p>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 10,
+            }}
+          >
+            {BADGE_CATALOG.map((badge) => {
+              const isUnlocked = unlockedBadgeKeys.has(badge.key);
+              const isSelected = profile.selected_badge_key === badge.key;
+              const isSavingThis = badgeSaving === badge.key;
+
+              return (
+                <button
+                  key={badge.key}
+                  type="button"
+                  onClick={() => handleSelectBadge(badge)}
+                  disabled={!isUnlocked || isSelected || !!badgeSaving}
+                  title={
+                    isUnlocked
+                      ? `Select ${badge.name}`
+                      : `Locked: ${badge.unlockText}`
+                  }
+                  style={{
+                    minHeight: 0,
+                    display: "grid",
+                    gridTemplateColumns: "44px 1fr",
+                    gap: 12,
+                    alignItems: "center",
+                    padding: 12,
+                    textAlign: "left",
+                    borderRadius: 16,
+                    border: isSelected
+                      ? "1px solid rgba(140,255,107,0.42)"
+                      : isUnlocked
+                        ? "1px solid rgba(255,255,255,0.12)"
+                        : "1px solid rgba(255,255,255,0.07)",
+                    background: isSelected
+                      ? "linear-gradient(90deg, rgba(140,255,107,0.1), rgba(255,255,255,0.035))"
+                      : isUnlocked
+                        ? "rgba(255,255,255,0.035)"
+                        : "rgba(255,255,255,0.018)",
+                    color: "var(--text)",
+                    cursor:
+                      !isUnlocked || isSelected || !!badgeSaving
+                        ? "default"
+                        : "pointer",
+                    opacity: 1,
+                    transform: "none",
+                  }}
+                >
+                  <span
+                    style={getBadgeStyle(badge.tone, {
+                      locked: !isUnlocked,
+                      selected: isSelected,
+                    })}
+                  >
+                    {isUnlocked ? badge.icon : "🔒"}
+                  </span>
+
+                  <span style={{ minWidth: 0 }}>
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        marginBottom: 5,
+                      }}
+                    >
+                      <strong
+                        style={{
+                          color: isUnlocked
+                            ? "var(--text)"
+                            : "rgba(255,255,255,0.42)",
+                          fontSize: "0.9rem",
+                          lineHeight: 1.15,
+                          letterSpacing: "-0.02em",
+                        }}
+                      >
+                        {badge.name}
+                      </strong>
+
+                      {isSelected && (
+                        <span
+                          style={{
+                            color: "rgba(140,255,107,0.88)",
+                            fontSize: "0.58rem",
+                            fontWeight: 950,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.12em",
+                          }}
+                        >
+                          Selected
+                        </span>
+                      )}
+                    </span>
+
+                    <span
+                      style={{
+                        display: "block",
+                        color: isUnlocked
+                          ? "rgba(255,255,255,0.56)"
+                          : "rgba(255,255,255,0.34)",
+                        fontSize: "0.74rem",
+                        fontWeight: 700,
+                        lineHeight: 1.35,
+                        textTransform: "none",
+                        letterSpacing: 0,
+                      }}
+                    >
+                      {isSavingThis
+                        ? "Saving..."
+                        : isUnlocked
+                          ? badge.description
+                          : badge.unlockText}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="profile-main-grid">

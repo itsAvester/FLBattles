@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 
 export type BadgeTone =
   | "champion"
@@ -277,6 +277,9 @@ export function BadgeIcon({
   title?: string;
 }) {
   const badge = getBadgeMeta(badgeKey);
+  const [imageFailed, setImageFailed] = useState(false);
+
+  const shouldShowImage = !!badge.imageSrc && !imageFailed && !locked;
 
   return (
     <span
@@ -289,11 +292,12 @@ export function BadgeIcon({
         minWidth: size,
       }}
     >
-      {badge.imageSrc ? (
+      {shouldShowImage ? (
         <img
-          src={badge.imageSrc}
+          src={badge.imageSrc ?? ""}
           alt=""
           draggable={false}
+          onError={() => setImageFailed(true)}
           style={{
             width: "100%",
             height: "100%",
@@ -304,6 +308,17 @@ export function BadgeIcon({
             pointerEvents: "none",
           }}
         />
+      ) : locked ? (
+        <span
+          aria-hidden="true"
+          style={{
+            color: "rgba(255,255,255,0.7)",
+            fontSize: Math.round(size * 0.44),
+            lineHeight: 1,
+          }}
+        >
+          🔒
+        </span>
       ) : (
         <DefaultBadgeIcon size={size} />
       )}

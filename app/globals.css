@@ -10016,3 +10016,76 @@ button.battle-custom-segment-active:hover {
     min-height: 68px !important;
   }
 }
+/* =========================================================
+   LEADERBOARD TABLE WIDTH + DENSITY FIX
+   Makes ranks #4-100 use the full card width and feel intentional.
+   ========================================================= */
+
+.leaderboard-table-card,
+.leaderboard-table-card-compact {
+  width: 100% !important;
+  max-width: none !important;
+  overflow: hidden !important;
+}
+
+.leaderboard-table-wrap {
+  width: 100% !important;
+  overflow-x: auto !important;
+}
+
+.leaderboard-table-wrap table {
+  width: 100% !important;
+  min-width: 920px !important;
+  table-layout: fixed !important;
+  border-collapse: collapse !important;
+}
+
+.leaderboard-table-wrap th:nth-child(1),
+.leaderboard-table-wrap td:nth-child(1) {
+  width: 72px !important;
+}
+
+.leaderboard-table-wrap th:nth-child(2),
+.leaderboard-table-wrap td:nth-child(2) {
+  width: auto !important;
+}
+
+.leaderboard-table-wrap th:nth-child(3),
+.leaderboard-table-wrap td:nth-child(3) {
+  width: 145px !important;
+}
+
+.leaderboard-table-wrap th:nth-child(4),
+.leaderboard-table-wrap td:nth-child(4) {
+  width: 145px !important;
+}
+
+.leaderboard-table-wrap th:nth-child(5),
+.leaderboard-table-wrap td:nth-child(5) {
+  width: 125px !important;
+}
+
+.leaderboard-table-wrap th,
+.leaderboard-table-wrap td {
+  padding: 16px 18px !important;
+}
+
+.leaderboard-table-wrap td:nth-child(3),
+.leaderboard-table-wrap td:nth-child(4),
+.leaderboard-table-wrap td:nth-child(5) {
+  text-align: right !important;
+  font-size: 1.02rem !important;
+  font-weight: 850 !important;
+}
+
+.leaderboard-player-cell,
+.leaderboard-player-info,
+.leaderboard-table-player {
+  min-width: 0 !important;
+}
+
+.leaderboard-player-name,
+.leaderboard-table-player-name {
+  max-width: 100% !important;
+  overflow-wrap: anywhere !important;
+}

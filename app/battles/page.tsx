@@ -33,19 +33,33 @@ function getLobbyIdFromResponse(data: unknown): string | null {
 
 function getLobbyIdFromInput(value: string): string {
   const trimmed = value.trim();
+
+  if (!trimmed) return "";
+
   const uuidMatch = trimmed.match(
-    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+    /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i
   );
 
-  return uuidMatch?.[0] ?? trimmed;
+  if (uuidMatch?.[0]) return uuidMatch[0];
+
+  try {
+    const url = new URL(trimmed);
+    const pathMatch = url.pathname.match(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i
+    );
+
+    return pathMatch?.[0] ?? trimmed;
+  } catch {
+    return trimmed;
+  }
 }
 
 export default function BattlesPage() {
   const router = useRouter();
 
+  const [activeMode, setActiveMode] = useState<BattleMode>("ranked");
   const [creating, setCreating] = useState<CreatingState>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeMode, setActiveMode] = useState<BattleMode>("ranked");
 
   const [customMaxPlayers, setCustomMaxPlayers] = useState(7);
   const [customDurationSeconds, setCustomDurationSeconds] = useState(15 * 60);
@@ -235,191 +249,156 @@ export default function BattlesPage() {
   };
 
   return (
-    <main className="battle-command-page">
-      <section className="page-inner battle-command-shell">
-        <header className="battle-command-header">
-          <div>
-            <div className="eyebrow battle-command-eyebrow">
+    <main className="battle-app-page">
+      <section className="page-inner battle-app-shell">
+        <header className="battle-app-header">
+          <div className="battle-app-title-block">
+            <div className="eyebrow battle-app-eyebrow">
               <span className="eyebrow-dot" />
               Battle hub
             </div>
 
-            <h1 className="battle-command-title">Choose your battle.</h1>
+            <h1>Choose your battle.</h1>
 
-            <p className="battle-command-description">
-              Start ranked matchmaking, create an invite-only room, or join a
-              private lobby with a code.
+            <p>
+              Start ranked matchmaking, create a private room, or join with a
+              lobby code.
             </p>
           </div>
 
           <button
             type="button"
-            className="btn-secondary battle-command-submit-sample-top"
+            className="btn-secondary battle-app-submit-sample"
             onClick={() => router.push("/samples/submit")}
           >
             Submit Sample
           </button>
         </header>
 
-        {error && <div className="battle-command-error">{error}</div>}
+        {error && <div className="battle-app-error">{error}</div>}
 
-        <div className="battle-command-layout">
-          <nav className="battle-mode-selector" aria-label="Battle modes">
-            <button
-              type="button"
-              className={
-                activeMode === "ranked"
-                  ? "battle-mode-card battle-mode-card-active"
-                  : "battle-mode-card"
-              }
-              onClick={() => selectMode("ranked")}
-              disabled={isBusy}
-              aria-pressed={activeMode === "ranked"}
-            >
-              <span className="battle-mode-kicker">Ranked</span>
-              <strong>Find a match</strong>
-              <span>Public queue · affects rating</span>
-            </button>
+        <nav className="battle-app-tabs" aria-label="Battle modes">
+          <button
+            type="button"
+            className={
+              activeMode === "ranked"
+                ? "battle-app-tab battle-app-tab-active"
+                : "battle-app-tab"
+            }
+            onClick={() => selectMode("ranked")}
+            disabled={isBusy}
+            aria-pressed={activeMode === "ranked"}
+          >
+            <span>Ranked</span>
+            <strong>Find match</strong>
+            <em>Public queue</em>
+          </button>
 
-            <button
-              type="button"
-              className={
-                activeMode === "custom"
-                  ? "battle-mode-card battle-mode-card-active"
-                  : "battle-mode-card"
-              }
-              onClick={() => selectMode("custom")}
-              disabled={isBusy}
-              aria-pressed={activeMode === "custom"}
-            >
-              <span className="battle-mode-kicker">Private</span>
-              <strong>Create lobby</strong>
-              <span>Invite-only · unranked</span>
-            </button>
+          <button
+            type="button"
+            className={
+              activeMode === "custom"
+                ? "battle-app-tab battle-app-tab-active"
+                : "battle-app-tab"
+            }
+            onClick={() => selectMode("custom")}
+            disabled={isBusy}
+            aria-pressed={activeMode === "custom"}
+          >
+            <span>Private</span>
+            <strong>Create lobby</strong>
+            <em>Invite-only</em>
+          </button>
 
-            <button
-              type="button"
-              className={
-                activeMode === "join"
-                  ? "battle-mode-card battle-mode-card-active"
-                  : "battle-mode-card"
-              }
-              onClick={() => selectMode("join")}
-              disabled={isBusy}
-              aria-pressed={activeMode === "join"}
-            >
-              <span className="battle-mode-kicker">Code</span>
-              <strong>Join lobby</strong>
-              <span>Paste ID or full link</span>
-            </button>
-          </nav>
+          <button
+            type="button"
+            className={
+              activeMode === "join"
+                ? "battle-app-tab battle-app-tab-active"
+                : "battle-app-tab"
+            }
+            onClick={() => selectMode("join")}
+            disabled={isBusy}
+            aria-pressed={activeMode === "join"}
+          >
+            <span>Code</span>
+            <strong>Join lobby</strong>
+            <em>ID or link</em>
+          </button>
+        </nav>
 
-          <section className="battle-command-panel">
-            {activeMode === "ranked" && (
-              <div className="battle-panel-content">
-                <div className="battle-panel-topline">
-                  <div className="battle-panel-heading-block">
-                    <span className="battle-panel-pill battle-panel-pill-ranked">
-                      Current selection
-                    </span>
-                    <h2>Ranked Match</h2>
-                    <p>
-                      Queue into a public battle, flip the same sample, and play
-                      for rating, season position, and profile stats.
-                    </p>
+        <section className="battle-app-panel">
+          {activeMode === "ranked" && (
+            <div className="battle-app-panel-inner">
+              <div className="battle-app-panel-main">
+                <span className="battle-app-pill battle-app-pill-ranked">
+                  Current selection
+                </span>
+
+                <h2>Ranked Match</h2>
+
+                <p>
+                  Queue into a public battle, flip the same sample, and play for
+                  rating, monthly season position, and profile stats.
+                </p>
+
+                <button
+                  type="button"
+                  className="btn-primary battle-app-primary-button"
+                  onClick={handleRankedMatch}
+                  disabled={isBusy}
+                >
+                  {creating === "ranked"
+                    ? "Finding ranked match..."
+                    : "Find Ranked Match"}
+                </button>
+              </div>
+
+              <div className="battle-app-meta-stack">
+                <div className="battle-app-meta-grid">
+                  <div>
+                    <strong>15:00</strong>
+                    <span>Round timer</span>
                   </div>
-
-                  <div className="battle-panel-meta-grid">
-                    <div>
-                      <strong>15:00</strong>
-                      <span>Round timer</span>
-                    </div>
-                    <div>
-                      <strong>3–7</strong>
-                      <span>Players</span>
-                    </div>
-                    <div>
-                      <strong>Ranked</strong>
-                      <span>Rating</span>
-                    </div>
+                  <div>
+                    <strong>3–7</strong>
+                    <span>Players</span>
+                  </div>
+                  <div>
+                    <strong>Ranked</strong>
+                    <span>Rating</span>
                   </div>
                 </div>
 
-                <div className="battle-ranked-action-card">
-                  <div>
-                    <p className="panel-label">Ready when you are</p>
-                    <h3>Jump straight into matchmaking.</h3>
-                    <p>
-                      Best for players who want the fastest path into a battle
-                      and a clear reason to return to the leaderboard.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn-primary battle-command-main-button"
-                    onClick={handleRankedMatch}
-                    disabled={isBusy}
-                  >
-                    {creating === "ranked"
-                      ? "Finding ranked match..."
-                      : "Find Ranked Match"}
-                  </button>
-                </div>
-
-                <div className="battle-command-info-grid">
-                  <div>
-                    <span>01</span>
-                    Same sample for every player.
-                  </div>
-                  <div>
-                    <span>02</span>
-                    Voting decides the winner.
-                  </div>
-                  <div>
-                    <span>03</span>
-                    Results update the leaderboard.
-                  </div>
+                <div className="battle-app-chip-row">
+                  <span>Same sample</span>
+                  <span>Live voting</span>
+                  <span>Leaderboard stats</span>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {activeMode === "custom" && (
-              <form
-                className="battle-panel-content"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  handleCreateCustomLobby();
-                }}
-              >
-                <div className="battle-panel-topline">
-                  <div className="battle-panel-heading-block">
-                    <span className="battle-panel-pill">Private setup</span>
-                    <h2>Create Private Lobby</h2>
-                    <p>
-                      Build an invite-only room, then send the lobby link or ID
-                      to friends. Custom battles stay unranked.
-                    </p>
-                  </div>
+          {activeMode === "custom" && (
+            <form
+              className="battle-app-panel-inner battle-app-panel-inner-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleCreateCustomLobby();
+              }}
+            >
+              <div className="battle-app-panel-main battle-app-custom-main">
+                <span className="battle-app-pill">Private setup</span>
 
-                  <div className="battle-panel-meta-grid">
-                    <div>
-                      <strong>{selectedDuration?.label ?? "15 min"}</strong>
-                      <span>Length</span>
-                    </div>
-                    <div>
-                      <strong>2–{customMaxPlayers}</strong>
-                      <span>Players</span>
-                    </div>
-                    <div>
-                      <strong>Private</strong>
-                      <span>Lobby</span>
-                    </div>
-                  </div>
-                </div>
+                <h2>Create Private Lobby</h2>
 
-                <div className="battle-command-form-grid">
-                  <label className="battle-command-field">
+                <p>
+                  Build an invite-only room, choose the round settings, then send
+                  the lobby link or ID to friends.
+                </p>
+
+                <div className="battle-app-custom-grid">
+                  <label className="battle-app-field">
                     <span>Player limit</span>
                     <input
                       type="number"
@@ -436,10 +415,9 @@ export default function BattlesPage() {
                         );
                       }}
                     />
-                    <small>Maximum invited players.</small>
                   </label>
 
-                  <label className="battle-command-field">
+                  <label className="battle-app-field">
                     <span>Battle length</span>
                     <select
                       value={customDurationSeconds}
@@ -453,93 +431,103 @@ export default function BattlesPage() {
                         </option>
                       ))}
                     </select>
-                    <small>Production time before voting.</small>
                   </label>
                 </div>
+              </div>
 
-                <div className="battle-command-control-grid">
-                  <div className="battle-command-control-group">
-                    <p className="panel-label">Sample choice</p>
-                    <div className="battle-command-segment-row">
-                      <button
-                        type="button"
-                        className={
-                          sampleSource === "random"
-                            ? "battle-command-segment battle-command-segment-active"
-                            : "battle-command-segment"
-                        }
-                        onClick={() => {
-                          setSampleSource("random");
-                          setSampleFile(null);
-                        }}
-                      >
-                        Random sample
-                      </button>
+              <div className="battle-app-meta-stack battle-app-custom-controls">
+                <div className="battle-app-meta-grid">
+                  <div>
+                    <strong>{selectedDuration?.label ?? "15 min"}</strong>
+                    <span>Length</span>
+                  </div>
+                  <div>
+                    <strong>2–{customMaxPlayers}</strong>
+                    <span>Players</span>
+                  </div>
+                  <div>
+                    <strong>Private</strong>
+                    <span>Lobby</span>
+                  </div>
+                </div>
 
-                      <button
-                        type="button"
-                        className={
-                          sampleSource === "host_upload"
-                            ? "battle-command-segment battle-command-segment-active"
-                            : "battle-command-segment"
-                        }
-                        onClick={() => setSampleSource("host_upload")}
-                      >
-                        Upload sample
-                      </button>
-                    </div>
+                <div className="battle-app-control-group">
+                  <p className="panel-label">Sample</p>
+                  <div className="battle-app-segment-row">
+                    <button
+                      type="button"
+                      className={
+                        sampleSource === "random"
+                          ? "battle-app-segment battle-app-segment-active"
+                          : "battle-app-segment"
+                      }
+                      onClick={() => {
+                        setSampleSource("random");
+                        setSampleFile(null);
+                      }}
+                    >
+                      Random
+                    </button>
 
-                    {sampleSource === "host_upload" && (
-                      <div className="battle-command-upload">
-                        <input
-                          type="file"
-                          accept="audio/*"
-                          onChange={(event) =>
-                            setSampleFile(event.target.files?.[0] ?? null)
-                          }
-                        />
-                        <small>
-                          {sampleFile
-                            ? sampleFile.name
-                            : "Choose an audio file to use for this lobby."}
-                        </small>
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      className={
+                        sampleSource === "host_upload"
+                          ? "battle-app-segment battle-app-segment-active"
+                          : "battle-app-segment"
+                      }
+                      onClick={() => setSampleSource("host_upload")}
+                    >
+                      Upload
+                    </button>
                   </div>
 
-                  <div className="battle-command-control-group">
-                    <p className="panel-label">Voting style</p>
-                    <div className="battle-command-segment-row">
-                      <button
-                        type="button"
-                        className={
-                          votingStyle === "everyone"
-                            ? "battle-command-segment battle-command-segment-active"
-                            : "battle-command-segment"
+                  {sampleSource === "host_upload" && (
+                    <label className="battle-app-upload">
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        onChange={(event) =>
+                          setSampleFile(event.target.files?.[0] ?? null)
                         }
-                        onClick={() => setVotingStyle("everyone")}
-                      >
-                        Everyone votes
-                      </button>
+                      />
+                      <span>{sampleFile ? sampleFile.name : "Choose audio file"}</span>
+                    </label>
+                  )}
+                </div>
 
-                      <button
-                        type="button"
-                        className={
-                          votingStyle === "host"
-                            ? "battle-command-segment battle-command-segment-active"
-                            : "battle-command-segment"
-                        }
-                        onClick={() => setVotingStyle("host")}
-                      >
-                        Host decides
-                      </button>
-                    </div>
+                <div className="battle-app-control-group">
+                  <p className="panel-label">Voting</p>
+                  <div className="battle-app-segment-row">
+                    <button
+                      type="button"
+                      className={
+                        votingStyle === "everyone"
+                          ? "battle-app-segment battle-app-segment-active"
+                          : "battle-app-segment"
+                      }
+                      onClick={() => setVotingStyle("everyone")}
+                    >
+                      Everyone
+                    </button>
+
+                    <button
+                      type="button"
+                      className={
+                        votingStyle === "host"
+                          ? "battle-app-segment battle-app-segment-active"
+                          : "battle-app-segment"
+                      }
+                      onClick={() => setVotingStyle("host")}
+                    >
+                      Host
+                    </button>
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="btn-primary battle-command-main-button battle-command-wide-button"
+                  className="btn-primary battle-app-primary-button battle-app-full-button"
                   disabled={
                     isBusy || (sampleSource === "host_upload" && !sampleFile)
                   }
@@ -548,44 +536,29 @@ export default function BattlesPage() {
                     ? "Creating invite-only lobby..."
                     : "Create Invite-Only Lobby"}
                 </button>
-              </form>
-            )}
+              </div>
+            </form>
+          )}
 
-            {activeMode === "join" && (
-              <form
-                className="battle-panel-content"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  handleJoinCustomLobby();
-                }}
-              >
-                <div className="battle-panel-topline">
-                  <div className="battle-panel-heading-block">
-                    <span className="battle-panel-pill">Invite code</span>
-                    <h2>Join Private Lobby</h2>
-                    <p>
-                      Paste a lobby ID or the full shared battle link. The page
-                      will pull out the lobby ID automatically.
-                    </p>
-                  </div>
+          {activeMode === "join" && (
+            <form
+              className="battle-app-panel-inner"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleJoinCustomLobby();
+              }}
+            >
+              <div className="battle-app-panel-main">
+                <span className="battle-app-pill">Invite code</span>
 
-                  <div className="battle-panel-meta-grid">
-                    <div>
-                      <strong>ID</strong>
-                      <span>Required</span>
-                    </div>
-                    <div>
-                      <strong>Private</strong>
-                      <span>Access</span>
-                    </div>
-                    <div>
-                      <strong>Unranked</strong>
-                      <span>Rating</span>
-                    </div>
-                  </div>
-                </div>
+                <h2>Join Private Lobby</h2>
 
-                <label className="battle-command-field battle-command-field-full">
+                <p>
+                  Paste a lobby ID or full invite link. FL Battles will extract
+                  the lobby ID automatically.
+                </p>
+
+                <label className="battle-app-field battle-app-join-field">
                   <span>Lobby ID or invite link</span>
                   <input
                     type="text"
@@ -594,39 +567,42 @@ export default function BattlesPage() {
                     placeholder="Paste lobby ID or full lobby URL"
                     spellCheck={false}
                   />
-                  <small>
-                    Use the exact ID or link from the host. Custom lobbies are
-                    not shown in public matchmaking.
-                  </small>
                 </label>
+              </div>
+
+              <div className="battle-app-meta-stack">
+                <div className="battle-app-meta-grid">
+                  <div>
+                    <strong>ID</strong>
+                    <span>Required</span>
+                  </div>
+                  <div>
+                    <strong>Private</strong>
+                    <span>Access</span>
+                  </div>
+                  <div>
+                    <strong>Unranked</strong>
+                    <span>Rating</span>
+                  </div>
+                </div>
 
                 <button
                   type="submit"
-                  className="btn-primary battle-command-main-button battle-command-wide-button"
+                  className="btn-primary battle-app-primary-button battle-app-full-button"
                   disabled={isBusy || !joinLobbyId.trim()}
                 >
                   {creating === "joining" ? "Joining..." : "Join Custom Lobby"}
                 </button>
-              </form>
-            )}
-          </section>
-        </div>
 
-        <aside className="battle-command-sample-strip">
-          <div>
-            <p className="panel-label">Community samples</p>
-            <strong>Want your sound in future ranked battles?</strong>
-            <span>Submit a short audio sample for approval.</span>
-          </div>
-
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => router.push("/samples/submit")}
-          >
-            Submit Sample
-          </button>
-        </aside>
+                <div className="battle-app-chip-row">
+                  <span>Paste ID</span>
+                  <span>Or full URL</span>
+                  <span>Invite-only</span>
+                </div>
+              </div>
+            </form>
+          )}
+        </section>
       </section>
     </main>
   );

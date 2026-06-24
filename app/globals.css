@@ -8847,3 +8847,536 @@ button.battle-custom-segment-active:hover {
     line-height: 0.92 !important;
   }
 }
+
+/* =========================================================
+   BATTLE APP SCREEN REDESIGN
+   Paste at the VERY BOTTOM of app/globals.css.
+   Makes /battles feel like a single-screen command center.
+   ========================================================= */
+
+.battle-app-page {
+  position: relative;
+  min-height: calc(100vh - 104px);
+  padding: 22px 0 26px;
+  overflow: hidden;
+}
+
+.battle-app-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 16% 10%, rgba(255, 77, 28, 0.14), transparent 34%),
+    radial-gradient(circle at 82% 12%, rgba(140, 255, 107, 0.10), transparent 34%),
+    radial-gradient(circle at 58% 100%, rgba(255, 77, 28, 0.08), transparent 32%);
+  opacity: 0.95;
+}
+
+.battle-app-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+}
+
+.battle-app-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+}
+
+.battle-app-title-block {
+  min-width: 0;
+}
+
+.battle-app-eyebrow {
+  margin-bottom: 10px !important;
+}
+
+.battle-app-header h1 {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(3rem, 5vw, 5.15rem);
+  font-weight: 850;
+  line-height: 0.9;
+  letter-spacing: -0.078em;
+}
+
+.battle-app-header p {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: rgba(244, 241, 232, 0.66);
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.battle-app-submit-sample {
+  min-height: 44px;
+  padding-inline: 18px;
+  white-space: nowrap;
+}
+
+.battle-app-error {
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 77, 28, 0.42);
+  background: rgba(255, 77, 28, 0.075);
+  color: #ffd4ca;
+  font-size: 0.88rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.battle-app-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.battle-app-tab {
+  min-height: 82px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.015)),
+    rgba(0, 0, 0, 0.22);
+  color: var(--text);
+  text-align: left;
+  box-shadow: none;
+}
+
+.battle-app-tab:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background:
+    radial-gradient(circle at 0% 50%, rgba(255, 77, 28, 0.09), transparent 42%),
+    rgba(255, 255, 255, 0.035);
+}
+
+.battle-app-tab-active {
+  border-color: rgba(255, 77, 28, 0.55);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 77, 28, 0.19), transparent 45%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    rgba(255, 77, 28, 0.08);
+}
+
+.battle-app-tab span,
+.battle-app-pill {
+  color: var(--orange);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+.battle-app-tab strong {
+  color: var(--text);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.battle-app-tab em {
+  color: rgba(244, 241, 232, 0.52);
+  font-style: normal;
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.battle-app-panel {
+  min-height: 360px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 77, 28, 0.14), transparent 38%),
+    radial-gradient(circle at 100% 0%, rgba(140, 255, 107, 0.11), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)),
+    rgba(0, 0, 0, 0.32);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.34),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+}
+
+.battle-app-panel-inner {
+  min-height: 360px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 0.54fr);
+  gap: 22px;
+  align-items: stretch;
+  padding: 24px;
+}
+
+.battle-app-panel-main {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+}
+
+.battle-app-pill {
+  width: fit-content;
+  min-height: 29px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 77, 28, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 77, 28, 0.09);
+}
+
+.battle-app-pill-ranked {
+  border-color: rgba(140, 255, 107, 0.28);
+  background: rgba(140, 255, 107, 0.07);
+  color: var(--green);
+}
+
+.battle-app-panel h2 {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2.45rem, 4.2vw, 4.2rem);
+  font-weight: 850;
+  line-height: 0.9;
+  letter-spacing: -0.075em;
+}
+
+.battle-app-panel p {
+  max-width: 690px;
+  margin: 14px 0 0;
+  color: rgba(244, 241, 232, 0.62);
+  font-size: 0.98rem;
+  line-height: 1.48;
+}
+
+.battle-app-primary-button {
+  width: fit-content;
+  min-height: 52px;
+  margin-top: 20px;
+  padding-inline: 24px;
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif !important;
+  font-size: 1rem !important;
+  font-weight: 850 !important;
+  letter-spacing: -0.035em !important;
+  text-transform: none !important;
+}
+
+.battle-app-full-button {
+  width: 100%;
+  margin-top: 0;
+}
+
+.battle-app-meta-stack {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 14px;
+}
+
+.battle-app-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.battle-app-meta-grid div {
+  min-height: 88px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.battle-app-meta-grid strong {
+  display: block;
+  color: var(--text);
+  font-size: clamp(1.1rem, 1.5vw, 1.45rem);
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.battle-app-meta-grid span {
+  display: block;
+  margin-top: 9px;
+  color: rgba(244, 241, 232, 0.42);
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.battle-app-chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.battle-app-chip-row span {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(244, 241, 232, 0.64);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.battle-app-panel-inner-form {
+  align-items: center;
+}
+
+.battle-app-custom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.battle-app-field {
+  display: grid;
+  gap: 8px;
+}
+
+.battle-app-field > span,
+.battle-app-control-group .panel-label {
+  margin: 0;
+  color: rgba(244, 241, 232, 0.5);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.battle-app-field input,
+.battle-app-field select {
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.34);
+  color: var(--text);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  outline: none;
+}
+
+.battle-app-field input:focus,
+.battle-app-field select:focus {
+  border-color: rgba(255, 77, 28, 0.55);
+  box-shadow: 0 0 0 3px rgba(255, 77, 28, 0.1);
+}
+
+.battle-app-join-field {
+  max-width: 720px;
+  margin-top: 20px;
+}
+
+.battle-app-custom-controls {
+  align-content: start;
+}
+
+.battle-app-control-group {
+  display: grid;
+  gap: 9px;
+}
+
+.battle-app-segment-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.battle-app-segment {
+  min-height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.94rem;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  text-transform: none;
+  box-shadow: none;
+}
+
+.battle-app-segment:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.battle-app-segment-active {
+  border-color: rgba(255, 77, 28, 0.72);
+  background: linear-gradient(90deg, rgba(255, 77, 28, 0.95), rgba(255, 133, 62, 0.92));
+  color: #060606;
+}
+
+.battle-app-upload {
+  min-height: 42px;
+  display: grid;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(244, 241, 232, 0.62);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.battle-app-upload input {
+  width: 100%;
+  color: rgba(244, 241, 232, 0.7);
+}
+
+@media (max-height: 760px) and (min-width: 900px) {
+  .battle-app-page {
+    padding-top: 14px;
+    padding-bottom: 18px;
+  }
+
+  .battle-app-shell {
+    gap: 9px;
+  }
+
+  .battle-app-eyebrow {
+    margin-bottom: 8px !important;
+  }
+
+  .battle-app-header h1 {
+    font-size: clamp(2.55rem, 4.35vw, 4.35rem);
+  }
+
+  .battle-app-header p {
+    margin-top: 8px;
+    font-size: 0.92rem;
+  }
+
+  .battle-app-tab {
+    min-height: 70px;
+    padding: 11px 13px;
+  }
+
+  .battle-app-panel,
+  .battle-app-panel-inner {
+    min-height: 330px;
+  }
+
+  .battle-app-panel-inner {
+    padding: 20px;
+  }
+
+  .battle-app-panel h2 {
+    font-size: clamp(2.2rem, 3.65vw, 3.65rem);
+  }
+
+  .battle-app-panel p {
+    margin-top: 10px;
+    font-size: 0.92rem;
+  }
+
+  .battle-app-primary-button {
+    min-height: 48px;
+    margin-top: 16px;
+  }
+
+  .battle-app-meta-grid div {
+    min-height: 76px;
+    padding: 13px;
+  }
+}
+
+@media (max-width: 980px) {
+  .battle-app-page {
+    overflow: visible;
+  }
+
+  .battle-app-header {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .battle-app-submit-sample {
+    width: fit-content;
+  }
+
+  .battle-app-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-app-tab {
+    min-height: 74px;
+  }
+
+  .battle-app-panel-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-app-meta-stack {
+    align-content: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .battle-app-page {
+    padding-top: 18px;
+    padding-bottom: 42px;
+  }
+
+  .battle-app-header h1 {
+    font-size: clamp(2.8rem, 15vw, 4.2rem);
+  }
+
+  .battle-app-header p {
+    font-size: 0.92rem;
+  }
+
+  .battle-app-tab {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .battle-app-tab em {
+    white-space: normal;
+  }
+
+  .battle-app-panel,
+  .battle-app-panel-inner {
+    min-height: 0;
+  }
+
+  .battle-app-panel-inner {
+    padding: 18px;
+  }
+
+  .battle-app-panel h2 {
+    font-size: clamp(2.25rem, 12vw, 3.4rem);
+  }
+
+  .battle-app-meta-grid,
+  .battle-app-custom-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -3,11 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
+import { censorChatMessage } from "../../lib/chatModeration";
 
 const INITIAL_TIME = 15 * 60; // 15 minutes in seconds
 const QUEUE_READY_TIME = 60; // 60 seconds after min players are reached
 const VOTING_TIME = 2 * 60 + 30; // 2 minutes 30 seconds
 const PRODUCTION_WARNING_SECONDS = [60, 50, 40, 30, 20, 10];
+const CHAT_MESSAGE_LIMIT = 300;
+const CHAT_COOLDOWN_MS = 4000;
+const CHAT_HISTORY_LIMIT = 80;
 
 
 type Phase = "countdown" | "upload" | "results";
@@ -61,6 +65,20 @@ type LobbyPlayer = {
   user_id: string;
   joined_at: string;
   displayName?: string;
+};
+
+type PlayerProfileSummary = {
+  displayName: string;
+  rating: number;
+  selectedBadgeKey: string | null;
+};
+
+type ChatMessage = {
+  id: string;
+  lobby_id: string;
+  user_id: string;
+  message: string;
+  created_at: string;
 };
 
 // Helper: decide if lobby should start
@@ -176,6 +194,41 @@ function getRankTheme(rank: string) {
         glow: "none",
       };
   }
+}
+
+
+function getBadgeDisplay(badgeKey: string | null | undefined) {
+  if (!badgeKey) return null;
+
+  const knownBadges: Record<string, { label: string; short: string }> = {
+    season_champion: { label: "Champion Pace", short: "CH" },
+    season_top_10: { label: "Top 10 Pace", short: "T10" },
+    season_most_active: { label: "Most Active", short: "ACT" },
+    first_win: { label: "First Win", short: "W1" },
+    win_streak: { label: "Win Streak", short: "WS" },
+    battle_winner: { label: "Battle Winner", short: "BW" },
+  };
+
+  if (knownBadges[badgeKey]) return knownBadges[badgeKey];
+
+  const label = badgeKey
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+  const short = label
+    .split(" ")
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 3)
+    .toUpperCase();
+
+  return { label: label || "Badge", short: short || "BDG" };
+}
+
+function normalizeChatForComparison(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function formatQueueEta(seconds: number | null): string {
@@ -334,7 +387,7 @@ const playMinPlayersFoundSound = () => {
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
   const [lobbyLoading, setLobbyLoading] = useState(true);
   const [playerProfilesById, setPlayerProfilesById] = useState<
-  Record<string, { displayName: string; rating: number }>
+  Record<string, PlayerProfileSummary>
 >({});
 const [topTenUserIds, setTopTenUserIds] = useState<Set<string>>(new Set());
 const [submittedUserIds, setSubmittedUserIds] = useState<Set<string>>(new Set());
@@ -394,6 +447,15 @@ const submittedUsersLoadedRef = useRef(false);
   
   const [votingTimeLeft, setVotingTimeLeft] = useState<number>(VOTING_TIME);
 
+  // lobby chat
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const lastChatSentAtRef = useRef<number>(0);
+
   const battleDurationSeconds = lobby?.battle_duration_seconds ?? INITIAL_TIME;
   const battleDurationDisplay = formatDuration(battleDurationSeconds);
   const isCustomLobby = lobby?.mode === "custom" || requestedMode === "custom";
@@ -405,6 +467,10 @@ const submittedUsersLoadedRef = useRef(false);
     !!currentUserId && submittedUserIds.has(currentUserId);
   const currentUserCanVote =
     currentUserSubmitted && (!isHostVoting || currentUserIsHost);
+  const chatEnabled =
+    !!lobby &&
+    (lobby.status === "searching" || lobby.status === "in_progress") &&
+    phase !== "results";
 
   // leaving / penalty
   const [leaving, setLeaving] = useState(false);
@@ -446,6 +512,12 @@ const submittedUsersLoadedRef = useRef(false);
     setVoteError(null);
     setAllVotesIn(false);
     setVotingTimeLeft(VOTING_TIME);
+    setChatMessages([]);
+    setChatDraft("");
+    setChatLoading(false);
+    setChatSending(false);
+    setChatError(null);
+    lastChatSentAtRef.current = 0;
     setLeaving(false);
     setLeaveError(null);
     previousPlayerIdsRef.current = new Set();
@@ -467,7 +539,7 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, display_name, rating")
+    .select("id, display_name, rating, selected_badge_key")
     .in("id", userIds);
 
   if (error) {
@@ -487,16 +559,41 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
     setTopTenUserIds(new Set((topTenProfiles ?? []).map((profile: any) => profile.id)));
   }
 
-  const profileMap: Record<string, { displayName: string; rating: number }> = {};
+  const profileMap: Record<string, PlayerProfileSummary> = {};
 
   for (const profile of data ?? []) {
     profileMap[profile.id] = {
       displayName: profile.display_name || "Unnamed Producer",
       rating: profile.rating ?? 0,
+      selectedBadgeKey: profile.selected_badge_key ?? null,
     };
   }
 
   setPlayerProfilesById(profileMap);
+};
+
+const loadChatMessages = async () => {
+  if (!battleId) return;
+
+  setChatLoading(true);
+  setChatError(null);
+
+  const { data, error } = await supabase
+    .from("battle_chat_messages")
+    .select("id, lobby_id, user_id, message, created_at")
+    .eq("lobby_id", battleId)
+    .order("created_at", { ascending: true })
+    .limit(CHAT_HISTORY_LIMIT);
+
+  if (error) {
+    console.error("Failed to load battle chat:", error);
+    setChatError("Could not load chat.");
+    setChatLoading(false);
+    return;
+  }
+
+  setChatMessages((data ?? []) as ChatMessage[]);
+  setChatLoading(false);
 };
   const applyLobbyState = (lobbyRow: Lobby) => {
     setLobby(lobbyRow);
@@ -638,6 +735,44 @@ const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
   useEffect(() => {
     refreshLobbyState({ showLoading: true });
   }, [battleId]);
+
+  useEffect(() => {
+    if (!chatEnabled) {
+      setChatError(null);
+      return;
+    }
+
+    loadChatMessages();
+
+    const chatChannel = supabase
+      .channel(`battle_chat_messages:${battleId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "battle_chat_messages",
+          filter: `lobby_id=eq.${battleId}`,
+        },
+        (payload) => {
+          const nextMessage = payload.new as ChatMessage;
+          setChatMessages((prev) => {
+            if (prev.some((message) => message.id === nextMessage.id)) return prev;
+            return [...prev.slice(-(CHAT_HISTORY_LIMIT - 1)), nextMessage];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(chatChannel);
+    };
+  }, [battleId, chatEnabled]);
+
+  useEffect(() => {
+    if (!chatScrollRef.current) return;
+    chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+  }, [chatMessages.length, chatEnabled]);
 
 
   // If someone opens a shared custom lobby link, add them to that lobby while it is still searching.
@@ -1819,6 +1954,69 @@ setLoadingSubmissions(false);
       else router.push("/battles");
     }
   };
+const handleSendChatMessage = async (event: React.FormEvent<HTMLFormElement>) => {
+  event.preventDefault();
+
+  if (!chatEnabled) {
+    setChatError("Chat is only open while the lobby is searching or the battle upload timer is running.");
+    return;
+  }
+
+  if (!currentUserId) {
+    setChatError("You must be logged in to chat.");
+    return;
+  }
+
+  const rawMessage = chatDraft.trim();
+  if (!rawMessage) return;
+
+  if (rawMessage.length > CHAT_MESSAGE_LIMIT) {
+    setChatError(`Messages must be ${CHAT_MESSAGE_LIMIT} characters or less.`);
+    return;
+  }
+
+  const now = Date.now();
+  const msUntilNextMessage = CHAT_COOLDOWN_MS - (now - lastChatSentAtRef.current);
+  if (msUntilNextMessage > 0) {
+    setChatError(`Slow down — you can send another message in ${Math.ceil(msUntilNextMessage / 1000)}s.`);
+    return;
+  }
+
+  const censoredMessage = censorChatMessage(rawMessage).slice(0, CHAT_MESSAGE_LIMIT);
+  const normalizedMessage = normalizeChatForComparison(censoredMessage);
+  const lastOwnMessage = [...chatMessages]
+    .reverse()
+    .find((message) => message.user_id === currentUserId);
+
+  if (
+    lastOwnMessage &&
+    normalizeChatForComparison(lastOwnMessage.message) === normalizedMessage
+  ) {
+    setChatError("You already sent that message. Try saying it a different way.");
+    return;
+  }
+
+  setChatSending(true);
+  setChatError(null);
+
+  const { error } = await supabase.from("battle_chat_messages").insert({
+    lobby_id: battleId,
+    user_id: currentUserId,
+    message: censoredMessage,
+  });
+
+  if (error) {
+    console.error("Failed to send battle chat message:", error);
+    setChatError(error.message || "Could not send message.");
+    setChatSending(false);
+    return;
+  }
+
+  lastChatSentAtRef.current = Date.now();
+  setChatDraft("");
+  setChatSending(false);
+};
+
 const submittedUserIdsFromLoadedSubmissions = new Set(
   submissions.map((s) => s.user_id)
 );
@@ -1997,307 +2195,434 @@ useEffect(() => {
               </div>
             </div>
 
-            <div className="battle-lobby-player-list-card">
-              <div className="battle-lobby-player-list-head">
-                <p className="battle-lobby-section-label">Players in lobby</p>
-                <span className="battle-lobby-player-count-note">{playerCount} active</span>
-              </div>
-
-              <div className="battle-lobby-player-chip-row">
-                {uniqueActivePlayers.map((player, index) => {
-                  const profile = playerProfilesById[player.user_id];
-                  const displayName = profile?.displayName ?? `Player ${index + 1}`;
-                  const rating = profile?.rating ?? 0;
-                  const ratingRank = getRankFromRating(rating);
-                  const rank = topTenUserIds.has(player.user_id) ? "Top 10" : ratingRank;
-                  const rankTheme = getRankTheme(rank);
-                  const hasSubmitted = submittedUserIds.has(player.user_id);
-
-                  return (
-                    <span
-                      key={player.user_id}
-                      className={`battle-lobby-player-chip ${
-                        hasSubmitted ? "battle-lobby-player-chip-submitted" : ""
-                      }`}
-                      title={hasSubmitted ? "Beat submitted" : "Waiting for submission"}
-                    >
-                      <span
-                        className="battle-lobby-rank-pill"
-                        style={{
-                          color: rankTheme.text,
-                          borderColor: rankTheme.border,
-                          background: rankTheme.background,
-                          boxShadow: rankTheme.glow,
-                        }}
-                      >
-                        {rank}
-                      </span>
-                      <span className="battle-lobby-player-name">{displayName}</span>
-                      {hasSubmitted && <span className="battle-lobby-submitted-check">✓</span>}
+            <div
+              className={`battle-lobby-live-area ${
+                chatEnabled ? "battle-lobby-live-area-with-chat" : ""
+              } ${
+                matchStarted && phase !== "results"
+                  ? "battle-lobby-live-area-production"
+                  : ""
+              }`}
+            >
+              <div className="battle-lobby-live-main">
+                <div className="battle-lobby-player-list-card">
+                  <div className="battle-lobby-player-list-head">
+                    <p className="battle-lobby-section-label">Players in lobby</p>
+                    <span className="battle-lobby-player-count-note">
+                      {playerCount} active
                     </span>
-                  );
-                })}
-              </div>
-            </div>
+                  </div>
 
-            {lobby.status === "searching" && !matchStarted && (
-              <div className="battle-lobby-matchmaking-card">
-                <div className="battle-lobby-matchmaking-head">
-                  <div>
-                    <p className="battle-lobby-section-label">Matchmaking</p>
-                    <h4 className="battle-lobby-matchmaking-title">
+                  <div className="battle-lobby-player-chip-row">
+                    {uniqueActivePlayers.map((player, index) => {
+                      const profile = playerProfilesById[player.user_id];
+                      const displayName = profile?.displayName ?? `Player ${index + 1}`;
+                      const rating = profile?.rating ?? 0;
+                      const ratingRank = getRankFromRating(rating);
+                      const rank = topTenUserIds.has(player.user_id)
+                        ? "Top 10"
+                        : ratingRank;
+                      const rankTheme = getRankTheme(rank);
+                      const selectedBadge = getBadgeDisplay(profile?.selectedBadgeKey);
+                      const hasSubmitted = submittedUserIds.has(player.user_id);
+
+                      return (
+                        <span
+                          key={player.user_id}
+                          className={`battle-lobby-player-chip ${
+                            hasSubmitted ? "battle-lobby-player-chip-submitted" : ""
+                          }`}
+                          title={hasSubmitted ? "Beat submitted" : "Waiting for submission"}
+                        >
+                          <span
+                            className="battle-lobby-rank-pill"
+                            style={{
+                              color: rankTheme.text,
+                              borderColor: rankTheme.border,
+                              background: rankTheme.background,
+                              boxShadow: rankTheme.glow,
+                            }}
+                          >
+                            {rank}
+                          </span>
+
+                          {selectedBadge && (
+                            <span
+                              className="battle-lobby-badge-pill"
+                              title={selectedBadge.label}
+                            >
+                              {selectedBadge.short}
+                            </span>
+                          )}
+
+                          <span className="battle-lobby-player-name">
+                            {displayName}
+                          </span>
+
+                          {hasSubmitted && (
+                            <span className="battle-lobby-submitted-check">✓</span>
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {lobby.status === "searching" && !matchStarted && (
+                  <div className="battle-lobby-matchmaking-card">
+                    <div className="battle-lobby-matchmaking-head">
+                      <div>
+                        <p className="battle-lobby-section-label">Matchmaking</p>
+                        <h4 className="battle-lobby-matchmaking-title">
+                          {isCustomLobby
+                            ? currentUserIsHost
+                              ? playerCount >= 2
+                                ? "Ready when you are"
+                                : `Need ${Math.max(2 - playerCount, 0)} more player${
+                                    Math.max(2 - playerCount, 0) === 1 ? "" : "s"
+                                  }`
+                              : "Waiting for host"
+                            : queueReady
+                            ? `Starting in ${formatQueueEta(autoStartEta)}`
+                            : `Need ${playersNeeded} more player${
+                                playersNeeded === 1 ? "" : "s"
+                              }`}
+                        </h4>
+                      </div>
+
+                      <div className="battle-lobby-mini-queue-box">
+                        <span className="battle-lobby-mini-queue-label">Queue</span>
+                        <strong className="battle-lobby-mini-queue-value">
+                          {playerCount}/{lobby.min_players}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="battle-lobby-progress-block">
+                      <div className="battle-lobby-progress-topline">
+                        <span>Minimum players</span>
+                        <span>{Math.round(queueFillPercent)}%</span>
+                      </div>
+                      <div className="battle-lobby-progress-track">
+                        <div
+                          className="battle-lobby-progress-fill battle-lobby-progress-fill-primary"
+                          style={{ width: `${queueFillPercent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="battle-lobby-progress-block">
+                      <div className="battle-lobby-progress-topline">
+                        <span>Lobby capacity</span>
+                        <span>
+                          {playerCount}/{lobby.max_players}
+                        </span>
+                      </div>
+                      <div className="battle-lobby-progress-track battle-lobby-progress-track-secondary">
+                        <div
+                          className="battle-lobby-progress-fill battle-lobby-progress-fill-secondary"
+                          style={{ width: `${lobbyCapacityPercent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <p className="battle-lobby-matchmaking-footnote">
                       {isCustomLobby
                         ? currentUserIsHost
                           ? playerCount >= 2
-                            ? "Ready when you are"
-                            : `Need ${Math.max(2 - playerCount, 0)} more player${
-                                Math.max(2 - playerCount, 0) === 1 ? "" : "s"
-                              }`
-                          : "Waiting for host"
+                            ? "Minimum players reached. Start the custom battle whenever you are ready."
+                            : "Custom battles require at least 2 active players before the host can start."
+                          : "This is a custom lobby. The battle will begin when the host starts it."
                         : queueReady
-                        ? `Starting in ${formatQueueEta(autoStartEta)}`
-                        : `Need ${playersNeeded} more player${playersNeeded === 1 ? "" : "s"}`}
-                    </h4>
-                  </div>
+                        ? `Minimum players reached. The battle will start automatically in ${formatQueueEta(
+                            autoStartEta
+                          )} or immediately if the lobby fills to ${lobby.max_players}.`
+                        : `The queue will begin once at least ${lobby.min_players} players have joined. The lobby can hold up to ${lobby.max_players} players.`}
+                    </p>
 
-                  <div className="battle-lobby-mini-queue-box">
-                    <span className="battle-lobby-mini-queue-label">Queue</span>
-                    <strong className="battle-lobby-mini-queue-value">
-                      {playerCount}/{lobby.min_players}
-                    </strong>
-                  </div>
-                </div>
+                    {isCustomLobby && (
+                      <div className="battle-custom-start-card">
+                        {currentUserIsHost ? (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              onClick={handleHostStartCustomBattle}
+                              disabled={hostStartingBattle || playerCount < 2}
+                            >
+                              {hostStartingBattle
+                                ? "Starting Battle..."
+                                : playerCount < 2
+                                ? "Need 2 Players"
+                                : "Start Battle"}
+                            </button>
 
-                <div className="battle-lobby-progress-block">
-                  <div className="battle-lobby-progress-topline">
-                    <span>Minimum players</span>
-                    <span>{Math.round(queueFillPercent)}%</span>
-                  </div>
-                  <div className="battle-lobby-progress-track">
-                    <div
-                      className="battle-lobby-progress-fill battle-lobby-progress-fill-primary"
-                      style={{ width: `${queueFillPercent}%` }}
-                    />
-                  </div>
-                </div>
+                            <p>
+                              {playerCount < 2
+                                ? "Invite at least one more player before starting."
+                                : "Starting the battle locks the lobby and begins the production timer."}
+                            </p>
+                          </>
+                        ) : (
+                          <p>Waiting for the host to start the battle.</p>
+                        )}
 
-                <div className="battle-lobby-progress-block">
-                  <div className="battle-lobby-progress-topline">
-                    <span>Lobby capacity</span>
-                    <span>
-                      {playerCount}/{lobby.max_players}
-                    </span>
-                  </div>
-                  <div className="battle-lobby-progress-track battle-lobby-progress-track-secondary">
-                    <div
-                      className="battle-lobby-progress-fill battle-lobby-progress-fill-secondary"
-                      style={{ width: `${lobbyCapacityPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                <p className="battle-lobby-matchmaking-footnote">
-                  {isCustomLobby
-                    ? currentUserIsHost
-                      ? playerCount >= 2
-                        ? "Minimum players reached. Start the custom battle whenever you are ready."
-                        : "Custom battles require at least 2 active players before the host can start."
-                      : "This is a custom lobby. The battle will begin when the host starts it."
-                    : queueReady
-                    ? `Minimum players reached. The battle will start automatically in ${formatQueueEta(autoStartEta)} or immediately if the lobby fills to ${lobby.max_players}.`
-                    : `The queue will begin once at least ${lobby.min_players} players have joined. The lobby can hold up to ${lobby.max_players} players.`}
-                </p>
-
-                {isCustomLobby && (
-                  <div
-                    style={{
-                      marginTop: 16,
-                      padding: "14px",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(0,0,0,0.22)",
-                      borderRadius: 14,
-                    }}
-                  >
-                    {currentUserIsHost ? (
-                      <>
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          onClick={handleHostStartCustomBattle}
-                          disabled={hostStartingBattle || playerCount < 2}
-                        >
-                          {hostStartingBattle
-                            ? "Starting Battle..."
-                            : playerCount < 2
-                            ? "Need 2 Players"
-                            : "Start Battle"}
-                        </button>
-
-                        <p
-                          style={{
-                            margin: "10px 0 0",
-                            color: "var(--muted)",
-                            fontSize: "0.9rem",
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {playerCount < 2
-                            ? "Invite at least one more player before starting."
-                            : "Starting the battle locks the lobby and begins the production timer."}
-                        </p>
-                      </>
-                    ) : (
-                      <p
-                        style={{
-                          margin: 0,
-                          color: "var(--muted)",
-                          fontSize: "0.95rem",
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        Waiting for the host to start the battle.
-                      </p>
-                    )}
-
-                    {hostControlError && (
-                      <p
-                        style={{
-                          margin: "10px 0 0",
-                          color: "#f97373",
-                          fontSize: "0.9rem",
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        {hostControlError}
-                      </p>
+                        {hostControlError && (
+                          <p className="battle-production-error">
+                            {hostControlError}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {matchStarted && (
-              <p style={{ fontSize: "0.9rem", color: "#22c55e" }}>
-                Battle has started!
-              </p>
-            )}
+                {matchStarted && phase !== "results" && (
+                  <section className="battle-production-panel battle-production-panel-inline">
+                    <div className="battle-production-topbar">
+                      <div>
+                        <p className="battle-lobby-section-label">Production phase</p>
+                        <h3 className="battle-production-title">Make your beat</h3>
+                      </div>
+
+                      <div
+                        className={`battle-production-timer ${
+                          timerIsUrgent ? "battle-production-timer-urgent" : ""
+                        }`}
+                      >
+                        <span>Time left</span>
+                        <strong>{roundTimerDisplay}</strong>
+                      </div>
+                    </div>
+
+                    <p className="battle-production-description">
+                      Use the shared sample below, create your clip in FL Studio,
+                      and upload before the timer ends.
+                    </p>
+
+                    <div className="battle-production-grid battle-production-grid-inline">
+                      <div className="battle-sample-card">
+                        <div className="battle-sample-card-head">
+                          <div>
+                            <p className="battle-lobby-section-label">
+                              Battle sample
+                            </p>
+                            <h4>Sample for this battle</h4>
+                          </div>
+
+                          {sampleUrl && (
+                            <span className="battle-sample-ready-chip">Ready</span>
+                          )}
+                        </div>
+
+                        {sampleLoading && (
+                          <p className="battle-production-muted">
+                            Loading sample...
+                          </p>
+                        )}
+
+                        {sampleError && (
+                          <p className="battle-production-error">
+                            Failed to load sample: {sampleError}
+                          </p>
+                        )}
+
+                        {!sampleLoading && !sampleError && sampleUrl && (
+                          <>
+                            <p className="battle-sample-file-name">
+                              {sampleName}
+                            </p>
+
+                            <audio controls className="battle-audio-player">
+                              <source src={sampleUrl} />
+                              Your browser does not support the audio element.
+                            </audio>
+
+                            <p className="battle-production-muted battle-production-helper-text">
+                              Download the sample and drop it into FL Studio.
+                            </p>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="battle-upload-card">
+                        <div className="battle-upload-card-head">
+                          <div>
+                            <p className="battle-lobby-section-label">Submission</p>
+                            <h4>Upload your track</h4>
+                          </div>
+
+                          <span
+                            className={
+                              uploadDone
+                                ? "battle-upload-status-chip battle-upload-status-done"
+                                : "battle-upload-status-chip"
+                            }
+                          >
+                            {uploadDone ? "Uploaded" : uploadWindowOpen ? "Open" : "Closed"}
+                          </span>
+                        </div>
+
+                        <p className="battle-production-muted battle-production-helper-text">
+                          Accepted: mp3, wav, and other audio files.
+                        </p>
+
+                        <div className="battle-file-input-wrap">
+                          <input
+                            type="file"
+                            accept="audio/*"
+                            onChange={handleFileChange}
+                            disabled={!uploadWindowOpen || uploading || uploadDone}
+                          />
+                        </div>
+
+                        <button
+                          onClick={handleUpload}
+                          className="btn-primary battle-upload-button"
+                          disabled={!uploadWindowOpen || uploading || uploadDone || !file}
+                        >
+                          {uploading
+                            ? "Uploading..."
+                            : uploadDone
+                            ? "Uploaded"
+                            : "Upload Track"}
+                        </button>
+
+                        {uploadError && (
+                          <p className="battle-production-error">{uploadError}</p>
+                        )}
+
+                        {!uploadWindowOpen && !uploadDone && (
+                          <p className="battle-production-error">
+                            Upload window has closed for this battle.
+                          </p>
+                        )}
+
+                        {uploadDone && (
+                          <p className="battle-production-success">
+                            Upload successful. Voting phase will begin shortly.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                )}
+              </div>
+
+              {chatEnabled && (
+                <aside className="battle-chat-card" aria-label="Lobby chat">
+                  <div className="battle-chat-head">
+                    <div>
+                      <p className="battle-lobby-section-label">Lobby chat</p>
+                      <h4 className="battle-chat-title">Room talk</h4>
+                    </div>
+                    <span className="battle-chat-live-pill">Live</span>
+                  </div>
+
+                  <div ref={chatScrollRef} className="battle-chat-message-list">
+                    {chatLoading && (
+                      <p className="battle-chat-empty">Loading chat...</p>
+                    )}
+
+                    {!chatLoading && chatMessages.length === 0 && (
+                      <p className="battle-chat-empty">
+                        No messages yet. Keep it clean and lobby-specific.
+                      </p>
+                    )}
+
+                    {!chatLoading &&
+                      chatMessages.map((message) => {
+                        const profile = playerProfilesById[message.user_id];
+                        const displayName =
+                          profile?.displayName ??
+                          (message.user_id === currentUserId ? "You" : "Producer");
+                        const rating = profile?.rating ?? 0;
+                        const ratingRank = getRankFromRating(rating);
+                        const rank = topTenUserIds.has(message.user_id)
+                          ? "Top 10"
+                          : ratingRank;
+                        const rankTheme = getRankTheme(rank);
+                        const selectedBadge = getBadgeDisplay(
+                          profile?.selectedBadgeKey
+                        );
+                        const isSelfMessage = message.user_id === currentUserId;
+
+                        return (
+                          <article
+                            key={message.id}
+                            className={`battle-chat-message ${
+                              isSelfMessage ? "battle-chat-message-self" : ""
+                            }`}
+                          >
+                            <div className="battle-chat-message-meta">
+                              <span
+                                className="battle-lobby-rank-pill battle-chat-rank-pill"
+                                style={{
+                                  color: rankTheme.text,
+                                  borderColor: rankTheme.border,
+                                  background: rankTheme.background,
+                                  boxShadow: rankTheme.glow,
+                                }}
+                              >
+                                {rank}
+                              </span>
+
+                              {selectedBadge && (
+                                <span
+                                  className="battle-lobby-badge-pill"
+                                  title={selectedBadge.label}
+                                >
+                                  {selectedBadge.short}
+                                </span>
+                              )}
+
+                              <strong>{displayName}</strong>
+                            </div>
+
+                            <p>{message.message}</p>
+                          </article>
+                        );
+                      })}
+                  </div>
+
+                  <form
+                    className="battle-chat-form"
+                    onSubmit={handleSendChatMessage}
+                  >
+                    <input
+                      value={chatDraft}
+                      onChange={(event) => {
+                        setChatDraft(event.target.value);
+                        if (chatError) setChatError(null);
+                      }}
+                      maxLength={CHAT_MESSAGE_LIMIT}
+                      placeholder="Message this lobby..."
+                      disabled={chatSending}
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={chatSending || !chatDraft.trim()}
+                    >
+                      {chatSending ? "Sending" : "Send"}
+                    </button>
+                  </form>
+
+                  <div className="battle-chat-foot">
+                    <span>
+                      {chatDraft.length}/{CHAT_MESSAGE_LIMIT}
+                    </span>
+                    <span>4s cooldown</span>
+                  </div>
+
+                  {chatError && <p className="battle-chat-error">{chatError}</p>}
+                </aside>
+              )}
+            </div>
+
           </>
         )}
       </div>
-
-      {/* PRODUCTION / UPLOAD PHASE */}
-      {matchStarted && phase !== "results" && (
-        <section className="battle-production-panel">
-          <div className="battle-production-topbar">
-            <div>
-              <p className="battle-lobby-section-label">Production phase</p>
-              <h3 className="battle-production-title">Make your beat</h3>
-            </div>
-
-            <div
-              className={`battle-production-timer ${
-                timerIsUrgent ? "battle-production-timer-urgent" : ""
-              }`}
-            >
-              <span>Time left</span>
-              <strong>{roundTimerDisplay}</strong>
-            </div>
-          </div>
-
-          <p className="battle-production-description">
-            Use the shared sample below, create your clip in FL Studio, and upload before the timer ends.
-          </p>
-
-          <div className="battle-production-grid">
-            <div className="battle-sample-card">
-              <div className="battle-sample-card-head">
-                <div>
-                  <p className="battle-lobby-section-label">Battle sample</p>
-                  <h4>Sample for this battle</h4>
-                </div>
-                {sampleUrl && <span className="battle-sample-ready-chip">Ready</span>}
-              </div>
-
-              {sampleLoading && (
-                <p className="battle-production-muted">Loading sample...</p>
-              )}
-
-              {sampleError && (
-                <p className="battle-production-error">
-                  Failed to load sample: {sampleError}
-                </p>
-              )}
-
-              {!sampleLoading && !sampleError && sampleUrl && (
-                <>
-                  <p className="battle-sample-file-name">
-                    {sampleName}
-                  </p>
-
-                  <audio controls className="battle-audio-player">
-                    <source src={sampleUrl} />
-                    Your browser does not support the audio element.
-                  </audio>
-
-                  <p className="battle-production-muted">
-                    Download the sample and drop it into FL Studio to start your beat.
-                  </p>
-                </>
-              )}
-            </div>
-
-            <div className="battle-upload-card">
-              <div className="battle-upload-card-head">
-                <div>
-                  <p className="battle-lobby-section-label">Submission</p>
-                  <h4>Upload your track</h4>
-                </div>
-                <span className={uploadDone ? "battle-upload-status-chip battle-upload-status-done" : "battle-upload-status-chip"}>
-                  {uploadDone ? "Uploaded" : uploadWindowOpen ? "Open" : "Closed"}
-                </span>
-              </div>
-
-              <p className="battle-production-muted">
-                Accepted: mp3, wav, and other audio files. You can replace your upload while the production timer is open.
-              </p>
-
-              <div className="battle-file-input-wrap">
-                <input
-                  type="file"
-                  accept="audio/*"
-                  onChange={handleFileChange}
-                  disabled={!uploadWindowOpen || uploading || uploadDone}
-                />
-              </div>
-
-
-              <button
-                onClick={handleUpload}
-                className="btn-primary battle-upload-button"
-                disabled={!uploadWindowOpen || uploading || uploadDone || !file}
-              >
-                {uploading ? "Uploading..." : uploadDone ? "Uploaded" : "Upload Track"}
-              </button>
-
-              {uploadError && (
-                <p className="battle-production-error">{uploadError}</p>
-              )}
-
-              {!uploadWindowOpen && !uploadDone && (
-                <p className="battle-production-error">
-                  Upload window has closed for this battle.
-                </p>
-              )}
-
-              {uploadDone && (
-                <p className="battle-production-success">
-                  Upload successful. Voting phase will begin shortly.
-                </p>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* RESULTS PHASE */}
       {matchStarted && phase === "results" && (

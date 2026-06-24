@@ -1,12 +1,28 @@
-export default function FaqPage() {
-  const pageFont =
-    "var(--font-manrope), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+"use client";
 
-  const faqSections = [
+import { useMemo, useState } from "react";
+
+type FaqItem = {
+  question: string;
+  answer: string;
+};
+
+type FaqSection = {
+  number: string;
+  label: string;
+  title: string;
+  summary: string;
+  items: FaqItem[];
+};
+
+export default function FaqPage() {
+  const faqSections: FaqSection[] = [
     {
       number: "01",
       label: "Battle flow",
       title: "How does FL Battles work?",
+      summary:
+        "Join a lobby, get a sample, make a beat, upload it, vote, and see how your result affects your profile.",
       items: [
         {
           question: "Join a battle lobby.",
@@ -44,6 +60,8 @@ export default function FaqPage() {
       number: "02",
       label: "Profiles",
       title: "What is my profile page for?",
+      summary:
+        "Your profile is your public identity on FLBattles: name, links, battle stats, rating, and rank position.",
       items: [
         {
           question: "Display name",
@@ -66,6 +84,8 @@ export default function FaqPage() {
       number: "03",
       label: "Ranking",
       title: "How does the ranking system work?",
+      summary:
+        "Players move through rank tiers based on rating. The top 10 players receive a special Champion title.",
       items: [
         {
           question: "Unranked",
@@ -110,6 +130,8 @@ export default function FaqPage() {
       number: "04",
       label: "Leaderboard",
       title: "How does the leaderboard work?",
+      summary:
+        "The leaderboard shows the strongest producers by rating and lets players search public profiles.",
       items: [
         {
           question: "Top players",
@@ -132,6 +154,8 @@ export default function FaqPage() {
       number: "05",
       label: "Audio",
       title: "Other questions",
+      summary:
+        "Use any DAW, export a clean audio file, and expect the system to keep improving while FLBattles is in beta.",
       items: [
         {
           question: "Can I use any DAW?",
@@ -152,327 +176,154 @@ export default function FaqPage() {
     },
   ];
 
+  const [activeSectionTitle, setActiveSectionTitle] = useState(
+    faqSections[0].title
+  );
+
+  const activeSection = useMemo(() => {
+    return (
+      faqSections.find((section) => section.title === activeSectionTitle) ??
+      faqSections[0]
+    );
+  }, [activeSectionTitle, faqSections]);
+
   return (
-    <section
-      className="page-inner"
-      style={{
-        paddingTop: 72,
-        paddingBottom: 96,
-        fontFamily: pageFont,
-      }}
-    >
-      <div className="eyebrow">
-        <span className="eyebrow-dot" />
-        Support desk · rules and ranking
-      </div>
-
-      <h1
-        style={{
-          margin: 0,
-          fontFamily: pageFont,
-          fontSize: "clamp(3.8rem, 8vw, 7.4rem)",
-          lineHeight: 0.86,
-          letterSpacing: "-0.075em",
-          fontWeight: 800,
-          color: "var(--text)",
-        }}
-      >
-        Battle
-        <br />
-        FAQ
-      </h1>
-
-      <p
-        className="page-description"
-        style={{
-          maxWidth: 720,
-          marginTop: 24,
-          color: "var(--muted)",
-          fontSize: "1rem",
-          lineHeight: 1.75,
-        }}
-      >
-        Answers to common questions about how FL Battles works, how ranks are
-        calculated, what your profile is for, and what to expect when the timer
-        starts.
-      </p>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          gap: 14,
-          marginTop: 34,
-          marginBottom: 18,
-        }}
-      >
-        <div className="card" style={{ padding: 22, overflow: "hidden" }}>
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <p className="panel-label">Timer</p>
-            <strong
-              style={{
-                display: "block",
-                marginTop: 8,
-                fontFamily: pageFont,
-                fontSize: "2.2rem",
-                lineHeight: 1,
-                letterSpacing: "-0.06em",
-                color: "var(--text)",
-              }}
-            >
-              15:00
-            </strong>
-            <p
-              style={{
-                margin: "10px 0 0",
-                color: "var(--muted)",
-                fontSize: "0.9rem",
-                lineHeight: 1.55,
-              }}
-            >
-              Every ranked battle is built around a short production window.
-            </p>
+    <section className="faq-page page-inner">
+      <div className="faq-hero">
+        <div className="faq-hero-copy">
+          <div className="eyebrow">
+            <span className="eyebrow-dot" />
+            Support desk · rules and ranking
           </div>
+
+          <h1>Battle FAQ</h1>
+
+          <p>
+            Answers to common questions about how FLBattles works, how ranks are
+            calculated, what your profile is for, and what to expect when the
+            timer starts.
+          </p>
         </div>
 
-        <div className="card" style={{ padding: 22, overflow: "hidden" }}>
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <p className="panel-label">Modes</p>
-            <strong
-              style={{
-                display: "block",
-                marginTop: 8,
-                fontFamily: pageFont,
-                fontSize: "2.2rem",
-                lineHeight: 1,
-                letterSpacing: "-0.06em",
-                color: "var(--text)",
-              }}
-            >
-              Ranked / Custom
-            </strong>
-            <p
-              style={{
-                margin: "10px 0 0",
-                color: "var(--muted)",
-                fontSize: "0.9rem",
-                lineHeight: 1.55,
-              }}
-            >
-              Play for rating or create private lobbies for friends.
-            </p>
-          </div>
-        </div>
+        <div className="faq-quick-card card">
+          <div className="faq-quick-card-inner">
+            <p className="panel-label">Quick facts</p>
 
-        <div className="card" style={{ padding: 22, overflow: "hidden" }}>
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <p className="panel-label">Goal</p>
-            <strong
-              style={{
-                display: "block",
-                marginTop: 8,
-                fontFamily: pageFont,
-                fontSize: "2.2rem",
-                lineHeight: 1,
-                letterSpacing: "-0.06em",
-                color: "var(--text)",
-              }}
-            >
-              Finish Ideas
-            </strong>
-            <p
-              style={{
-                margin: "10px 0 0",
-                color: "var(--muted)",
-                fontSize: "0.9rem",
-                lineHeight: 1.55,
-              }}
-            >
-              Get fast reps, upload your beat, vote, and run it back.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr)",
-          gap: 18,
-          marginTop: 18,
-        }}
-      >
-        {faqSections.map((section) => (
-          <div
-            key={section.title}
-            className="card"
-            style={{
-              padding: 26,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "relative",
-                zIndex: 1,
-                display: "grid",
-                gridTemplateColumns: "90px minmax(0, 1fr)",
-                gap: 24,
-                alignItems: "start",
-              }}
-            >
+            <div className="faq-quick-grid">
               <div>
-                <span
-                  style={{
-                    display: "block",
-                    color: "var(--orange)",
-                    fontFamily: pageFont,
-                    fontSize: "3.4rem",
-                    fontWeight: 800,
-                    lineHeight: 1,
-                    letterSpacing: "-0.08em",
-                  }}
-                >
-                  {section.number}
-                </span>
-
-                <p
-                  className="panel-label"
-                  style={{
-                    marginTop: 14,
-                    marginBottom: 0,
-                  }}
-                >
-                  {section.label}
-                </p>
+                <span>Timer</span>
+                <strong>15:00</strong>
               </div>
 
               <div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: 16,
-                    marginBottom: 18,
-                  }}
-                >
-                  <h2
-                    style={{
-                      margin: 0,
-                      fontFamily: pageFont,
-                      fontSize: "clamp(2rem, 3.4vw, 3.2rem)",
-                      fontWeight: 800,
-                      lineHeight: 0.95,
-                      letterSpacing: "-0.07em",
-                      color: "var(--text)",
-                    }}
-                  >
-                    {section.title}
-                  </h2>
+                <span>Modes</span>
+                <strong>Ranked / Custom</strong>
+              </div>
 
-                  <span className="sample-badge">Info</span>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    borderTop: "1px solid var(--line)",
-                  }}
-                >
-                  {section.items.map((item) => (
-                    <div
-                      key={item.question}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "minmax(180px, 0.42fr) minmax(0, 1fr)",
-                        gap: 18,
-                        padding: "16px 0",
-                        borderBottom: "1px solid var(--line)",
-                      }}
-                    >
-                      <h3
-                        style={{
-                          margin: 0,
-                          color: "var(--text)",
-                          fontSize: "0.95rem",
-                          fontWeight: 900,
-                          letterSpacing: "-0.02em",
-                        }}
-                      >
-                        {item.question}
-                      </h3>
-
-                      <p
-                        style={{
-                          margin: 0,
-                          color: "var(--muted)",
-                          fontSize: "0.92rem",
-                          lineHeight: 1.65,
-                        }}
-                      >
-                        {item.answer}
-                      </p>
-                    </div>
-                  ))}
-                </div>
+              <div>
+                <span>Goal</span>
+                <strong>Finish Ideas</strong>
               </div>
             </div>
           </div>
-        ))}
+        </div>
       </div>
 
-      <div
-        className="card"
-        style={{
-          marginTop: 18,
-          padding: 30,
-          overflow: "hidden",
-          textAlign: "center",
-        }}
-      >
-        <div style={{ position: "relative", zIndex: 1 }}>
+      <div className="faq-selector-card card">
+        <div className="faq-selector-inner">
+          <div className="faq-selector-copy">
+            <p className="panel-label">Choose a section</p>
+            <h2>{activeSection.label}</h2>
+            <p>{activeSection.summary}</p>
+          </div>
+
+          <div className="faq-select-wrap">
+            <label htmlFor="faq-section-select">FAQ section</label>
+            <select
+              id="faq-section-select"
+              value={activeSectionTitle}
+              onChange={(event) => setActiveSectionTitle(event.target.value)}
+            >
+              {faqSections.map((section) => (
+                <option key={section.title} value={section.title}>
+                  {section.number} · {section.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="faq-content-grid">
+        <aside className="faq-section-menu card" aria-label="FAQ sections">
+          <div className="faq-section-menu-inner">
+            <p className="panel-label">Sections</p>
+
+            <div className="faq-section-button-list">
+              {faqSections.map((section) => {
+                const isActive = section.title === activeSection.title;
+
+                return (
+                  <button
+                    key={section.title}
+                    type="button"
+                    className={`faq-section-button ${
+                      isActive ? "faq-section-button-active" : ""
+                    }`}
+                    onClick={() => setActiveSectionTitle(section.title)}
+                  >
+                    <span>{section.number}</span>
+                    <strong>{section.label}</strong>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </aside>
+
+        <article className="faq-active-card card">
+          <div className="faq-active-card-inner">
+            <div className="faq-active-heading">
+              <div>
+                <span className="faq-active-number">
+                  {activeSection.number}
+                </span>
+                <p className="panel-label">{activeSection.label}</p>
+              </div>
+
+              <div>
+                <h2>{activeSection.title}</h2>
+                <p>{activeSection.summary}</p>
+              </div>
+            </div>
+
+            <div className="faq-answer-list">
+              {activeSection.items.map((item) => (
+                <div key={item.question} className="faq-answer-row">
+                  <h3>{item.question}</h3>
+                  <p>{item.answer}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div className="faq-cta-card card">
+        <div className="faq-cta-inner">
           <div className="eyebrow centered">
             <span className="eyebrow-dot" />
             Ready to play?
           </div>
 
-          <h2
-            style={{
-              maxWidth: 760,
-              margin: "0 auto",
-              fontFamily: pageFont,
-              fontSize: "clamp(2.4rem, 5vw, 4.5rem)",
-              fontWeight: 800,
-              lineHeight: 0.9,
-              letterSpacing: "-0.075em",
-              color: "var(--text)",
-            }}
-          >
-            Start your next 15-minute battle.
-          </h2>
+          <h2>Start your next 15-minute battle.</h2>
 
-          <p
-            style={{
-              maxWidth: 600,
-              margin: "18px auto 0",
-              color: "var(--muted)",
-              lineHeight: 1.7,
-            }}
-          >
+          <p>
             Queue into a ranked lobby, flip the sample, upload your beat, and
             see how it stacks up.
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 12,
-              flexWrap: "wrap",
-              marginTop: 26,
-            }}
-          >
+          <div className="faq-cta-actions">
             <a href="/battles" className="btn-primary">
               Enter Queue
             </a>

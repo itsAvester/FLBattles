@@ -5,6 +5,7 @@ import { useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 type CreatingState = null | "ranked" | "custom" | "joining";
+type BattleMode = "ranked" | "custom" | "join";
 type SampleSource = "random" | "host_upload";
 type VotingStyle = "everyone" | "host";
 
@@ -30,14 +31,21 @@ function getLobbyIdFromResponse(data: unknown): string | null {
   return row?.out_lobby_id ?? row?.lobby_id ?? null;
 }
 
+function getLobbyIdFromInput(value: string): string {
+  const trimmed = value.trim();
+  const uuidMatch = trimmed.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  );
+
+  return uuidMatch?.[0] ?? trimmed;
+}
+
 export default function BattlesPage() {
   const router = useRouter();
 
   const [creating, setCreating] = useState<CreatingState>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const [showCustomSetup, setShowCustomSetup] = useState(false);
-  const [showJoinCustom, setShowJoinCustom] = useState(false);
+  const [activeMode, setActiveMode] = useState<BattleMode>("ranked");
 
   const [customMaxPlayers, setCustomMaxPlayers] = useState(7);
   const [customDurationSeconds, setCustomDurationSeconds] = useState(15 * 60);
@@ -48,6 +56,9 @@ export default function BattlesPage() {
   const [joinLobbyId, setJoinLobbyId] = useState("");
 
   const isBusy = creating !== null;
+  const selectedDuration = BATTLE_DURATIONS.find(
+    (duration) => duration.seconds === customDurationSeconds
+  );
 
   const getCurrentUser = async () => {
     const {
@@ -97,6 +108,12 @@ export default function BattlesPage() {
       sampleName: safeName,
       sampleUrl: publicUrlData.publicUrl,
     };
+  };
+
+  const selectMode = (mode: BattleMode) => {
+    if (isBusy) return;
+    setError(null);
+    setActiveMode(mode);
   };
 
   const handleRankedMatch = async () => {
@@ -185,7 +202,7 @@ export default function BattlesPage() {
   const handleJoinCustomLobby = async () => {
     if (isBusy) return;
 
-    const lobbyId = joinLobbyId.trim();
+    const lobbyId = getLobbyIdFromInput(joinLobbyId);
 
     if (!lobbyId) {
       setError("Enter a custom lobby ID first.");
@@ -217,91 +234,192 @@ export default function BattlesPage() {
     }
   };
 
-  const openCustomSetup = () => {
-    if (isBusy) return;
-    setError(null);
-    setShowJoinCustom(false);
-    setShowCustomSetup((prev) => !prev);
-  };
-
-  const openJoinCustom = () => {
-    if (isBusy) return;
-    setError(null);
-    setShowCustomSetup(false);
-    setShowJoinCustom((prev) => !prev);
-  };
-
   return (
-    <main className="battles-shell">
-      <section className="battles-hero">
-        <div className="page-inner battles-grid">
-          <div className="battles-copy">
-            <div className="eyebrow">
+    <main className="battle-command-page">
+      <section className="page-inner battle-command-shell">
+        <header className="battle-command-header">
+          <div>
+            <div className="eyebrow battle-command-eyebrow">
               <span className="eyebrow-dot" />
-              Battle hub · choose your mode
+              Battle hub
             </div>
 
-            <h1>
-              Enter the
-              <br />
-              Arena
-            </h1>
+            <h1 className="battle-command-title">Choose your battle.</h1>
 
-            <p className="hero-description">
-              Queue into ranked battles that affect your rating, create an
-              invite-only custom lobby, or join a custom room with the lobby ID.
+            <p className="battle-command-description">
+              Start ranked matchmaking, create an invite-only room, or join a
+              private lobby with a code.
             </p>
+          </div>
 
-            {error && <div className="battle-error">{error}</div>}
+          <button
+            type="button"
+            className="btn-secondary battle-command-submit-sample-top"
+            onClick={() => router.push("/samples/submit")}
+          >
+            Submit Sample
+          </button>
+        </header>
 
-            <div className="battle-mode-actions">
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleRankedMatch}
-                disabled={isBusy}
-              >
-                {creating === "ranked"
-                  ? "Finding ranked match..."
-                  : "Find Ranked Match"}
-              </button>
+        {error && <div className="battle-command-error">{error}</div>}
 
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={openCustomSetup}
-                disabled={isBusy}
-              >
-                {showCustomSetup ? "Hide Custom Setup" : "Create Custom Lobby"}
-              </button>
+        <div className="battle-command-layout">
+          <nav className="battle-mode-selector" aria-label="Battle modes">
+            <button
+              type="button"
+              className={
+                activeMode === "ranked"
+                  ? "battle-mode-card battle-mode-card-active"
+                  : "battle-mode-card"
+              }
+              onClick={() => selectMode("ranked")}
+              disabled={isBusy}
+              aria-pressed={activeMode === "ranked"}
+            >
+              <span className="battle-mode-kicker">Ranked</span>
+              <strong>Find a match</strong>
+              <span>Public queue · affects rating</span>
+            </button>
 
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={openJoinCustom}
-                disabled={isBusy}
-              >
-                {showJoinCustom ? "Hide Join Form" : "Join Custom Lobby"}
-              </button>
-            </div>
+            <button
+              type="button"
+              className={
+                activeMode === "custom"
+                  ? "battle-mode-card battle-mode-card-active"
+                  : "battle-mode-card"
+              }
+              onClick={() => selectMode("custom")}
+              disabled={isBusy}
+              aria-pressed={activeMode === "custom"}
+            >
+              <span className="battle-mode-kicker">Private</span>
+              <strong>Create lobby</strong>
+              <span>Invite-only · unranked</span>
+            </button>
 
-            {showCustomSetup && (
-              <div className="card battle-custom-panel">
-                <div className="battle-custom-panel-head">
-                  <div>
-                    <p className="panel-label">Custom battle setup</p>
-                    <h3>Host an invite-only room</h3>
+            <button
+              type="button"
+              className={
+                activeMode === "join"
+                  ? "battle-mode-card battle-mode-card-active"
+                  : "battle-mode-card"
+              }
+              onClick={() => selectMode("join")}
+              disabled={isBusy}
+              aria-pressed={activeMode === "join"}
+            >
+              <span className="battle-mode-kicker">Code</span>
+              <strong>Join lobby</strong>
+              <span>Paste ID or full link</span>
+            </button>
+          </nav>
+
+          <section className="battle-command-panel">
+            {activeMode === "ranked" && (
+              <div className="battle-panel-content">
+                <div className="battle-panel-topline">
+                  <div className="battle-panel-heading-block">
+                    <span className="battle-panel-pill battle-panel-pill-ranked">
+                      Current selection
+                    </span>
+                    <h2>Ranked Match</h2>
                     <p>
-                      Custom lobbies are not public matchmaking. Share the lobby
-                      ID or URL with people you want to invite.
+                      Queue into a public battle, flip the same sample, and play
+                      for rating, season position, and profile stats.
                     </p>
                   </div>
 
-                  <span className="custom-badge">2–30 Players</span>
+                  <div className="battle-panel-meta-grid">
+                    <div>
+                      <strong>15:00</strong>
+                      <span>Round timer</span>
+                    </div>
+                    <div>
+                      <strong>3–7</strong>
+                      <span>Players</span>
+                    </div>
+                    <div>
+                      <strong>Ranked</strong>
+                      <span>Rating</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="battle-custom-form-grid">
-                  <label className="battle-custom-field">
+                <div className="battle-ranked-action-card">
+                  <div>
+                    <p className="panel-label">Ready when you are</p>
+                    <h3>Jump straight into matchmaking.</h3>
+                    <p>
+                      Best for players who want the fastest path into a battle
+                      and a clear reason to return to the leaderboard.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-primary battle-command-main-button"
+                    onClick={handleRankedMatch}
+                    disabled={isBusy}
+                  >
+                    {creating === "ranked"
+                      ? "Finding ranked match..."
+                      : "Find Ranked Match"}
+                  </button>
+                </div>
+
+                <div className="battle-command-info-grid">
+                  <div>
+                    <span>01</span>
+                    Same sample for every player.
+                  </div>
+                  <div>
+                    <span>02</span>
+                    Voting decides the winner.
+                  </div>
+                  <div>
+                    <span>03</span>
+                    Results update the leaderboard.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeMode === "custom" && (
+              <form
+                className="battle-panel-content"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleCreateCustomLobby();
+                }}
+              >
+                <div className="battle-panel-topline">
+                  <div className="battle-panel-heading-block">
+                    <span className="battle-panel-pill">Private setup</span>
+                    <h2>Create Private Lobby</h2>
+                    <p>
+                      Build an invite-only room, then send the lobby link or ID
+                      to friends. Custom battles stay unranked.
+                    </p>
+                  </div>
+
+                  <div className="battle-panel-meta-grid">
+                    <div>
+                      <strong>{selectedDuration?.label ?? "15 min"}</strong>
+                      <span>Length</span>
+                    </div>
+                    <div>
+                      <strong>2–{customMaxPlayers}</strong>
+                      <span>Players</span>
+                    </div>
+                    <div>
+                      <strong>Private</strong>
+                      <span>Lobby</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="battle-command-form-grid">
+                  <label className="battle-command-field">
                     <span>Player limit</span>
                     <input
                       type="number"
@@ -321,7 +439,7 @@ export default function BattlesPage() {
                     <small>Maximum invited players.</small>
                   </label>
 
-                  <label className="battle-custom-field">
+                  <label className="battle-command-field">
                     <span>Battle length</span>
                     <select
                       value={customDurationSeconds}
@@ -339,409 +457,176 @@ export default function BattlesPage() {
                   </label>
                 </div>
 
-                <div className="battle-custom-control-group">
-                  <p className="panel-label">Sample choice</p>
+                <div className="battle-command-control-grid">
+                  <div className="battle-command-control-group">
+                    <p className="panel-label">Sample choice</p>
+                    <div className="battle-command-segment-row">
+                      <button
+                        type="button"
+                        className={
+                          sampleSource === "random"
+                            ? "battle-command-segment battle-command-segment-active"
+                            : "battle-command-segment"
+                        }
+                        onClick={() => {
+                          setSampleSource("random");
+                          setSampleFile(null);
+                        }}
+                      >
+                        Random sample
+                      </button>
 
-                  <div className="battle-custom-segment-row">
-                    <button
-                      type="button"
-                      className={
-                        sampleSource === "random"
-                          ? "battle-custom-segment battle-custom-segment-active"
-                          : "battle-custom-segment"
-                      }
-                      onClick={() => {
-                        setSampleSource("random");
-                        setSampleFile(null);
-                      }}
-                    >
-                      Random sample
-                    </button>
+                      <button
+                        type="button"
+                        className={
+                          sampleSource === "host_upload"
+                            ? "battle-command-segment battle-command-segment-active"
+                            : "battle-command-segment"
+                        }
+                        onClick={() => setSampleSource("host_upload")}
+                      >
+                        Upload sample
+                      </button>
+                    </div>
 
-                    <button
-                      type="button"
-                      className={
-                        sampleSource === "host_upload"
-                          ? "battle-custom-segment battle-custom-segment-active"
-                          : "battle-custom-segment"
-                      }
-                      onClick={() => setSampleSource("host_upload")}
-                    >
-                      Upload sample
-                    </button>
+                    {sampleSource === "host_upload" && (
+                      <div className="battle-command-upload">
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          onChange={(event) =>
+                            setSampleFile(event.target.files?.[0] ?? null)
+                          }
+                        />
+                        <small>
+                          {sampleFile
+                            ? sampleFile.name
+                            : "Choose an audio file to use for this lobby."}
+                        </small>
+                      </div>
+                    )}
                   </div>
 
-                  {sampleSource === "host_upload" && (
-                    <div className="battle-custom-upload">
-                      <input
-                        type="file"
-                        accept="audio/*"
-                        onChange={(event) =>
-                          setSampleFile(event.target.files?.[0] ?? null)
+                  <div className="battle-command-control-group">
+                    <p className="panel-label">Voting style</p>
+                    <div className="battle-command-segment-row">
+                      <button
+                        type="button"
+                        className={
+                          votingStyle === "everyone"
+                            ? "battle-command-segment battle-command-segment-active"
+                            : "battle-command-segment"
                         }
-                      />
-                      <small>
-                        This sample will be saved to the lobby and shared when
-                        the battle starts.
-                      </small>
+                        onClick={() => setVotingStyle("everyone")}
+                      >
+                        Everyone votes
+                      </button>
+
+                      <button
+                        type="button"
+                        className={
+                          votingStyle === "host"
+                            ? "battle-command-segment battle-command-segment-active"
+                            : "battle-command-segment"
+                        }
+                        onClick={() => setVotingStyle("host")}
+                      >
+                        Host decides
+                      </button>
                     </div>
-                  )}
-                </div>
-
-                <div className="battle-custom-control-group">
-                  <p className="panel-label">Voting style</p>
-
-                  <div className="battle-custom-segment-row">
-                    <button
-                      type="button"
-                      className={
-                        votingStyle === "everyone"
-                          ? "battle-custom-segment battle-custom-segment-active"
-                          : "battle-custom-segment"
-                      }
-                      onClick={() => setVotingStyle("everyone")}
-                    >
-                      Everyone votes
-                    </button>
-
-                    <button
-                      type="button"
-                      className={
-                        votingStyle === "host"
-                          ? "battle-custom-segment battle-custom-segment-active"
-                          : "battle-custom-segment"
-                      }
-                      onClick={() => setVotingStyle("host")}
-                    >
-                      Host decides
-                    </button>
                   </div>
                 </div>
 
                 <button
-                  type="button"
-                  className="btn-primary battle-custom-submit"
-                  onClick={handleCreateCustomLobby}
-                  disabled={isBusy}
+                  type="submit"
+                  className="btn-primary battle-command-main-button battle-command-wide-button"
+                  disabled={
+                    isBusy || (sampleSource === "host_upload" && !sampleFile)
+                  }
                 >
                   {creating === "custom"
                     ? "Creating invite-only lobby..."
                     : "Create Invite-Only Lobby"}
                 </button>
-              </div>
+              </form>
             )}
 
-            {showJoinCustom && (
-              <div className="card battle-custom-panel">
-                <div className="battle-custom-panel-head">
-                  <div>
-                    <p className="panel-label">Join custom battle</p>
-                    <h3>Enter a lobby ID</h3>
+            {activeMode === "join" && (
+              <form
+                className="battle-panel-content"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleJoinCustomLobby();
+                }}
+              >
+                <div className="battle-panel-topline">
+                  <div className="battle-panel-heading-block">
+                    <span className="battle-panel-pill">Invite code</span>
+                    <h2>Join Private Lobby</h2>
                     <p>
-                      Paste the custom lobby ID from the host. Only players with
-                      the exact ID or shared URL can join.
+                      Paste a lobby ID or the full shared battle link. The page
+                      will pull out the lobby ID automatically.
                     </p>
                   </div>
 
-                  <span className="custom-badge">Invite Only</span>
+                  <div className="battle-panel-meta-grid">
+                    <div>
+                      <strong>ID</strong>
+                      <span>Required</span>
+                    </div>
+                    <div>
+                      <strong>Private</strong>
+                      <span>Access</span>
+                    </div>
+                    <div>
+                      <strong>Unranked</strong>
+                      <span>Rating</span>
+                    </div>
+                  </div>
                 </div>
 
-                <label className="battle-custom-field battle-custom-field-full">
-                  <span>Lobby ID</span>
+                <label className="battle-command-field battle-command-field-full">
+                  <span>Lobby ID or invite link</span>
                   <input
                     type="text"
                     value={joinLobbyId}
                     onChange={(event) => setJoinLobbyId(event.target.value)}
-                    placeholder="17bfba96-d6b2-4bd6-90e2-2f4d653640b2"
+                    placeholder="Paste lobby ID or full lobby URL"
                     spellCheck={false}
                   />
-                  <small>Only users with the exact lobby ID can join.</small>
+                  <small>
+                    Use the exact ID or link from the host. Custom lobbies are
+                    not shown in public matchmaking.
+                  </small>
                 </label>
 
                 <button
-                  type="button"
-                  className="btn-primary battle-custom-submit"
-                  onClick={handleJoinCustomLobby}
+                  type="submit"
+                  className="btn-primary battle-command-main-button battle-command-wide-button"
                   disabled={isBusy || !joinLobbyId.trim()}
                 >
                   {creating === "joining" ? "Joining..." : "Join Custom Lobby"}
                 </button>
-              </div>
+              </form>
             )}
-
-            <div className="card battle-community-card">
-              <p className="panel-label">Community samples</p>
-
-              <h3>Submit a sample for future battles</h3>
-
-              <p>
-                Upload a short audio sample. If approved, it may appear in future
-                beat battles.
-              </p>
-
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => router.push("/samples/submit")}
-              >
-                Submit Sample
-              </button>
-            </div>
-
-            <p className="mini-note">
-              Ranked battles update rating and leaderboard stats. Custom battles
-              are private, unranked, and shareable by URL or lobby ID.
-            </p>
-          </div>
-
-          <div className="battle-window battles-window">
-            <div className="window-topbar">
-              <div className="window-dots">
-                <span />
-                <span />
-                <span />
-              </div>
-              <span className="window-title">MATCHMAKING</span>
-              <span className="window-status">
-                {creating ? "SYNCING" : "READY"}
-              </span>
-            </div>
-
-            <div className="stats-grid">
-              <div className="stat-box">
-                <strong>
-                  {showCustomSetup
-                    ? `${Math.round(customDurationSeconds / 60)}:00`
-                    : "15:00"}
-                </strong>
-                <span>Round timer</span>
-              </div>
-              <div className="stat-box">
-                <strong>{showCustomSetup ? `2-${customMaxPlayers}` : "3-7"}</strong>
-                <span>Players</span>
-              </div>
-              <div className="stat-box">
-                <strong>3</strong>
-                <span>Actions</span>
-              </div>
-            </div>
-
-            <div className="sample-panel">
-              <div>
-                <p className="panel-label">Current selection</p>
-                <h3>
-                  {creating === "custom"
-                    ? "Creating Custom Lobby"
-                    : creating === "joining"
-                      ? "Joining Custom Lobby"
-                      : creating === "ranked"
-                        ? "Ranked Queue"
-                        : showCustomSetup
-                          ? "Custom Setup"
-                          : showJoinCustom
-                            ? "Join Custom"
-                            : "Choose Battle Mode"}
-                </h3>
-              </div>
-
-              <div className="sample-badge">{creating ? "Loading" : "Live"}</div>
-            </div>
-
-            <div className="waveform-card">
-              <div className="waveform-header">
-                <span>Queue Signal</span>
-                <span>{creating ? "Syncing" : "Standby"}</span>
-              </div>
-
-              <div className="waveform">
-                <span style={{ height: "30%" }} />
-                <span style={{ height: "50%" }} />
-                <span style={{ height: "36%" }} />
-                <span style={{ height: "68%" }} />
-                <span style={{ height: "44%" }} />
-                <span style={{ height: "78%" }} />
-                <span style={{ height: "54%" }} />
-                <span style={{ height: "90%" }} />
-                <span style={{ height: "64%" }} />
-                <span style={{ height: "82%" }} />
-                <span style={{ height: "48%" }} />
-                <span style={{ height: "74%" }} />
-                <span style={{ height: "58%" }} />
-                <span style={{ height: "86%" }} />
-                <span style={{ height: "42%" }} />
-                <span style={{ height: "66%" }} />
-              </div>
-            </div>
-
-            <div className="task-table">
-              <div className="task-row task-head">
-                <span>Battle mode</span>
-                <span>Status</span>
-                <span>Rating</span>
-              </div>
-
-              <div className="task-row">
-                <span>Ranked Match</span>
-                <span
-                  className={
-                    creating === "ranked" ? "status running" : "status complete"
-                  }
-                >
-                  {creating === "ranked" ? "Searching" : "Ready"}
-                </span>
-                <span>Affects rank</span>
-              </div>
-
-              <div className="task-row">
-                <span>Create Custom</span>
-                <span
-                  className={
-                    creating === "custom" ? "status running" : "status waiting"
-                  }
-                >
-                  {creating === "custom" ? "Creating" : "Invite-only"}
-                </span>
-                <span>Unranked</span>
-              </div>
-
-              <div className="task-row">
-                <span>Join Custom</span>
-                <span
-                  className={
-                    creating === "joining" ? "status running" : "status waiting"
-                  }
-                >
-                  {creating === "joining" ? "Joining" : "Requires ID"}
-                </span>
-                <span>Unranked</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="page-inner battle-options-section">
-        <div className="section-heading">
-          <div className="eyebrow centered">
-            <span className="eyebrow-dot" />
-            Pick your format
-          </div>
-
-          <h2>Ranked pressure or private practice.</h2>
-
-          <p>
-            Ranked battles use public matchmaking. Custom battles are invite-only
-            and can be joined by exact lobby ID or shared URL.
-          </p>
+          </section>
         </div>
 
-        <div className="battle-option-grid">
-          <div className="card battle-option-card ranked-card">
-            <span className="card-number">01</span>
-
-            <div className="battle-card-topline">
-              <p className="panel-label">Competitive mode</p>
-              <span className="sample-badge">Ranked</span>
-            </div>
-
-            <h3>Ranked Battles</h3>
-
-            <p>
-              Play for points and climb the leaderboard. Ranked battles affect
-              your rating, tier, global rank, and profile stats.
-            </p>
-
-            <div className="check-list battle-check-list">
-              <div>
-                <span>✓</span>
-                Public server-side matchmaking backed by Supabase.
-              </div>
-              <div>
-                <span>✓</span>
-                Everyone flips the same shared sample.
-              </div>
-              <div>
-                <span>✓</span>
-                Fifteen minutes to produce and upload your track.
-              </div>
-              <div>
-                <span>✓</span>
-                Voting determines the winner and updates stats.
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="btn-primary battle-card-button"
-              onClick={handleRankedMatch}
-              disabled={isBusy}
-            >
-              {creating === "ranked"
-                ? "Finding ranked match..."
-                : "Find Ranked Match"}
-            </button>
+        <aside className="battle-command-sample-strip">
+          <div>
+            <p className="panel-label">Community samples</p>
+            <strong>Want your sound in future ranked battles?</strong>
+            <span>Submit a short audio sample for approval.</span>
           </div>
 
-          <div className="card battle-option-card custom-card">
-            <span className="card-number">02</span>
-
-            <div className="battle-card-topline">
-              <p className="panel-label">Private mode</p>
-              <span className="custom-badge">Unranked</span>
-            </div>
-
-            <h3>Custom Battles</h3>
-
-            <p>
-              Create a private lobby for friends, collabs, or practice. These
-              battles do not affect your leaderboard position.
-            </p>
-
-            <div className="check-list battle-check-list">
-              <div>
-                <span>✓</span>
-                Creates an invite-only lobby with a shareable URL.
-              </div>
-              <div>
-                <span>✓</span>
-                Friends can join using the exact lobby ID.
-              </div>
-              <div>
-                <span>✓</span>
-                Customize players, timer, sample, and voting rules.
-              </div>
-              <div>
-                <span>✓</span>
-                Best for testing, friendly battles, and Discord sessions.
-              </div>
-            </div>
-
-            <div className="battle-mode-actions">
-              <button
-                type="button"
-                className="btn-secondary battle-card-button"
-                onClick={openCustomSetup}
-                disabled={isBusy}
-              >
-                Create Custom Lobby
-              </button>
-
-              <button
-                type="button"
-                className="btn-secondary battle-card-button"
-                onClick={openJoinCustom}
-                disabled={isBusy}
-              >
-                Join Custom Lobby
-              </button>
-            </div>
-
-            <p className="battle-card-note">
-              Once you&apos;re in the lobby, copy the URL or lobby ID and send it
-              to anyone you want to invite.
-            </p>
-          </div>
-        </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => router.push("/samples/submit")}
+          >
+            Submit Sample
+          </button>
+        </aside>
       </section>
     </main>
   );

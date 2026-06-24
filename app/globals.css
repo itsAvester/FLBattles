@@ -7019,3 +7019,591 @@ button.battle-custom-segment-active:hover {
     max-width: 220px;
   }
 }
+/* =========================================================
+   BATTLE COMMAND CENTER REDESIGN
+   Replace the long battles marketing page with a focused mode dashboard.
+   Paste at the VERY BOTTOM of app/globals.css.
+   ========================================================= */
+
+.battle-command-page {
+  position: relative;
+  min-height: calc(100vh - 104px);
+  padding: 34px 0 56px;
+  overflow: hidden;
+}
+
+.battle-command-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 77, 28, 0.14), transparent 34%),
+    radial-gradient(circle at 82% 10%, rgba(140, 255, 107, 0.10), transparent 34%),
+    radial-gradient(circle at 62% 86%, rgba(255, 77, 28, 0.08), transparent 30%);
+  opacity: 0.95;
+}
+
+.battle-command-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+}
+
+.battle-command-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+}
+
+.battle-command-eyebrow {
+  margin-bottom: 13px;
+}
+
+.battle-command-title {
+  max-width: 880px;
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(3rem, 6.3vw, 6.2rem);
+  font-weight: 800;
+  line-height: 0.86;
+  letter-spacing: -0.075em;
+}
+
+.battle-command-description {
+  max-width: 720px;
+  margin: 16px 0 0;
+  color: rgba(244, 241, 232, 0.64);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.battle-command-submit-sample-top {
+  min-width: 156px;
+}
+
+.battle-command-error {
+  padding: 13px 15px;
+  color: #ffd4ca;
+  border: 1px solid rgba(255, 77, 28, 0.42);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 77, 28, 0.16), transparent 50%),
+    rgba(255, 77, 28, 0.07);
+  border-radius: 16px;
+  font-size: 0.9rem;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.battle-command-layout {
+  display: grid;
+  grid-template-columns: minmax(245px, 0.32fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.battle-mode-selector {
+  display: grid;
+  gap: 10px;
+}
+
+.battle-mode-card {
+  width: 100%;
+  min-height: 112px;
+  display: grid;
+  align-content: center;
+  justify-content: stretch;
+  gap: 7px;
+  padding: 16px;
+  text-align: left;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018)),
+    rgba(7, 7, 7, 0.72);
+  border-radius: 18px !important;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.24);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.battle-mode-card:hover {
+  transform: translateY(-1px);
+  color: var(--text);
+  border-color: rgba(255, 77, 28, 0.35);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 77, 28, 0.10), transparent 48%),
+    rgba(255, 255, 255, 0.035);
+}
+
+.battle-mode-card-active,
+.battle-mode-card-active:hover {
+  border-color: rgba(255, 77, 28, 0.58);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 77, 28, 0.22), transparent 46%),
+    linear-gradient(135deg, rgba(255, 77, 28, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(14, 10, 8, 0.88);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.32),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.battle-mode-card * {
+  position: relative;
+  z-index: 1;
+}
+
+.battle-mode-kicker {
+  color: var(--orange);
+  font-size: 0.68rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.battle-mode-card strong {
+  display: block;
+  color: var(--text);
+  font-size: 1.12rem;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  text-transform: none;
+}
+
+.battle-mode-card span:last-child {
+  color: rgba(244, 241, 232, 0.52);
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.battle-command-panel {
+  position: relative;
+  min-height: 442px;
+  overflow: hidden;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(140, 255, 107, 0.10), transparent 34%),
+    radial-gradient(circle at 8% 10%, rgba(255, 77, 28, 0.11), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(6, 6, 6, 0.82);
+  border-radius: 24px;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.36),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.battle-command-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 30px 30px;
+  opacity: 0.34;
+}
+
+.battle-panel-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+}
+
+.battle-panel-topline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.42fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.battle-panel-heading-block {
+  min-width: 0;
+}
+
+.battle-panel-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  color: rgba(244, 241, 232, 0.70);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.battle-panel-pill-ranked {
+  color: #050505;
+  border-color: var(--orange);
+  background: linear-gradient(90deg, var(--orange), #f6c65b);
+}
+
+.battle-panel-heading-block h2 {
+  margin: 13px 0 0;
+  color: var(--text);
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2.15rem, 4vw, 4rem);
+  font-weight: 850;
+  line-height: 0.9;
+  letter-spacing: -0.07em;
+}
+
+.battle-panel-heading-block p {
+  max-width: 690px;
+  margin: 13px 0 0;
+  color: rgba(244, 241, 232, 0.58);
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.battle-panel-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.battle-panel-meta-grid div {
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.24);
+  border-radius: 16px;
+}
+
+.battle-panel-meta-grid strong {
+  color: var(--text);
+  font-size: 1.08rem;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+.battle-panel-meta-grid span {
+  color: rgba(244, 241, 232, 0.38);
+  font-size: 0.62rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+}
+
+.battle-ranked-action-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 18px;
+  border: 1px solid rgba(255, 77, 28, 0.24);
+  background:
+    radial-gradient(circle at 100% 40%, rgba(255, 77, 28, 0.18), transparent 34%),
+    rgba(255, 255, 255, 0.035);
+  border-radius: 20px;
+}
+
+.battle-ranked-action-card h3 {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+}
+
+.battle-ranked-action-card p:not(.panel-label) {
+  max-width: 620px;
+  margin: 8px 0 0;
+  color: rgba(244, 241, 232, 0.56);
+  line-height: 1.55;
+}
+
+.battle-command-main-button {
+  min-height: 52px;
+  padding-inline: 24px;
+  border-radius: 14px !important;
+  white-space: nowrap;
+}
+
+.battle-command-wide-button {
+  width: 100%;
+}
+
+.battle-command-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.battle-command-info-grid div {
+  min-height: 78px;
+  padding: 14px;
+  color: rgba(244, 241, 232, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(0, 0, 0, 0.20);
+  border-radius: 16px;
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.battle-command-info-grid span {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--orange);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+.battle-command-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.battle-command-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.battle-command-field,
+.battle-command-control-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.battle-command-field-full {
+  margin-top: 2px;
+}
+
+.battle-command-field > span,
+.battle-command-control-group > .panel-label {
+  margin: 0;
+  color: rgba(244, 241, 232, 0.48);
+  font-size: 0.66rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.battle-command-field input,
+.battle-command-field select {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(0, 0, 0, 0.34);
+  border-radius: 14px;
+  outline: none;
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.battle-command-field select option {
+  color: var(--text);
+  background: #0b0b0b;
+}
+
+.battle-command-field input:focus,
+.battle-command-field select:focus {
+  border-color: rgba(255, 77, 28, 0.62);
+  box-shadow:
+    0 0 0 3px rgba(255, 77, 28, 0.10),
+    0 0 22px rgba(255, 77, 28, 0.10);
+}
+
+.battle-command-field small,
+.battle-command-upload small {
+  color: rgba(244, 241, 232, 0.42);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.battle-command-segment-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.battle-command-segment {
+  min-height: 48px;
+  padding: 0 12px;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.035);
+  border-radius: 14px !important;
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+}
+
+.battle-command-segment:hover {
+  color: var(--text);
+  border-color: rgba(255, 77, 28, 0.42);
+  background: rgba(255, 77, 28, 0.08);
+}
+
+.battle-command-segment-active,
+.battle-command-segment-active:hover {
+  color: #050505 !important;
+  border-color: var(--orange) !important;
+  background: linear-gradient(135deg, #ff5b24, #ff8738 54%, #ffa84d) !important;
+  box-shadow: 0 14px 34px rgba(255, 77, 28, 0.18) !important;
+}
+
+.battle-command-upload {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 11px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.026);
+  border-radius: 14px;
+}
+
+.battle-command-upload input[type="file"] {
+  width: 100%;
+  color: rgba(244, 241, 232, 0.62);
+  font-size: 0.82rem;
+}
+
+.battle-command-upload input[type="file"]::file-selector-button {
+  min-height: 32px;
+  margin-right: 10px;
+  padding: 0 12px;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  font-size: 0.66rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  cursor: pointer;
+}
+
+.battle-command-sample-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background:
+    linear-gradient(90deg, rgba(140, 255, 107, 0.055), rgba(255, 255, 255, 0.025), rgba(255, 77, 28, 0.045)),
+    rgba(5, 5, 5, 0.62);
+  border-radius: 18px;
+}
+
+.battle-command-sample-strip div {
+  min-width: 0;
+}
+
+.battle-command-sample-strip .panel-label {
+  margin-bottom: 5px;
+}
+
+.battle-command-sample-strip strong {
+  display: block;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.battle-command-sample-strip span {
+  display: block;
+  margin-top: 4px;
+  color: rgba(244, 241, 232, 0.50);
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+/* Hide the old long battles marketing section if a stale build/class remains. */
+.battle-command-page .battle-options-section,
+.battle-command-page .battle-window,
+.battle-command-page .battle-community-card,
+.battle-command-page .mini-note {
+  display: none !important;
+}
+
+@media (max-width: 1040px) {
+  .battle-command-layout,
+  .battle-panel-topline {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-mode-selector {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .battle-mode-card {
+    min-height: 104px;
+  }
+}
+
+@media (max-width: 780px) {
+  .battle-command-page {
+    padding: 26px 0 44px;
+  }
+
+  .battle-command-header {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .battle-command-submit-sample-top {
+    display: none;
+  }
+
+  .battle-command-title {
+    font-size: clamp(2.85rem, 16vw, 4.7rem);
+  }
+
+  .battle-mode-selector,
+  .battle-panel-meta-grid,
+  .battle-command-form-grid,
+  .battle-command-control-grid,
+  .battle-command-info-grid,
+  .battle-command-segment-row {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-command-panel {
+    min-height: auto;
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .battle-ranked-action-card,
+  .battle-command-sample-strip {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .battle-command-main-button,
+  .battle-command-sample-strip button {
+    width: 100%;
+  }
+}

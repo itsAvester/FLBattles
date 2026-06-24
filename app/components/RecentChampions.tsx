@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 type BattleMode = "ranked" | "custom";
@@ -29,9 +29,9 @@ function timeAgo(dateString: string) {
 }
 
 function getBattleLabel(mode: BattleMode | null) {
-  if (mode === "custom") return "Won a custom battle";
-  if (mode === "ranked") return "Won a ranked battle";
-  return "Won a battle";
+  if (mode === "custom") return "Custom battle winner";
+  if (mode === "ranked") return "Ranked battle winner";
+  return "Battle winner";
 }
 
 function getModeLabel(mode: BattleMode | null) {
@@ -52,7 +52,7 @@ export default function RecentChampions() {
         .from("live_activity_battle_winners")
         .select("battle_id, winner_name, finished_at, battle_mode")
         .order("finished_at", { ascending: false })
-        .limit(6);
+        .limit(12);
 
       if (error) {
         console.error("Error loading recent champions:", error);
@@ -67,12 +67,30 @@ export default function RecentChampions() {
     loadChampions();
   }, []);
 
+  const visibleChampions = useMemo(() => {
+    const seenNames = new Set<string>();
+    const unique: Champion[] = [];
+
+    champions.forEach((champion) => {
+      const normalizedName = (champion.winner_name || "A producer")
+        .trim()
+        .toLowerCase();
+
+      if (!seenNames.has(normalizedName)) {
+        seenNames.add(normalizedName);
+        unique.push(champion);
+      }
+    });
+
+    return (unique.length >= 3 ? unique : champions).slice(0, 4);
+  }, [champions]);
+
   return (
     <section className="recent-champions-card">
       <div className="recent-champions-header">
         <div>
           <span className="activity-dot" />
-          Recent Champions
+          Recent winners
         </div>
 
         <span className="activity-header-tag">Live</span>
@@ -80,13 +98,13 @@ export default function RecentChampions() {
 
       <div className="recent-champions-list">
         {loading ? (
-          <div className="activity-empty">Loading recent champions...</div>
-        ) : champions.length === 0 ? (
+          <div className="activity-empty">Loading recent winners...</div>
+        ) : visibleChampions.length === 0 ? (
           <div className="activity-empty">
             Recent battle winners will appear here.
           </div>
         ) : (
-          champions.map((champion, index) => (
+          visibleChampions.map((champion, index) => (
             <div
               className="recent-champion-row"
               key={`${champion.battle_id}-${champion.winner_name}-${index}`}
@@ -117,7 +135,7 @@ export default function RecentChampions() {
       </div>
 
       <a className="recent-champions-link" href="/leaderboard">
-        View the leaderboard →
+        View leaderboard →
       </a>
     </section>
   );

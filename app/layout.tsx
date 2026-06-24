@@ -2,6 +2,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import NavBar from "./components/NavBar";
+import SiteFooter from "./components/SiteFooter";
 import { Manrope } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next"
 import RegisteredProducerCount from "./components/RegisteredProducerCount";
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   </span>
 </div>
         <main className="page">{children}</main>
+        <SiteFooter />
         <Analytics />
       </body>
     </html>

@@ -9,6 +9,11 @@ const QUEUE_READY_TIME = 60; // 60 seconds after min players are reached
 const VOTING_TIME = 2 * 60 + 30; // 2 minutes 30 seconds
 const PRODUCTION_WARNING_SECONDS = [60, 50, 40, 30, 20, 10];
 
+const BATTLE_UPLOAD_RIGHTS_AGREEMENT_VERSION = "battle-upload-v1";
+
+const BATTLE_UPLOAD_RIGHTS_AGREEMENT =
+  "I confirm that I created this beat or have all necessary rights, licenses, and permissions to upload it to FLBattles for temporary battle hosting, streaming, voting, moderation, and results display. I understand that I am responsible for my submission and that FLBattles may remove it if it may violate copyright, site rules, or applicable law.";
+
 type Phase = "countdown" | "upload" | "results";
 
 type BattleLobbyProps = {
@@ -377,6 +382,7 @@ const submittedUsersLoadedRef = useRef(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadDone, setUploadDone] = useState(false);
+  const [beatRightsConfirmed, setBeatRightsConfirmed] = useState(false);
 
   // stats update state
   const [updatingStats, setUpdatingStats] = useState(false);
@@ -429,6 +435,7 @@ const submittedUsersLoadedRef = useRef(false);
     setUploading(false);
     setUploadError(null);
     setUploadDone(false);
+    setBeatRightsConfirmed(false);
     setUpdatingStats(false);
     setStatsUpdated(false);
     setSubmissions([]);
@@ -1535,6 +1542,7 @@ setLoadingSubmissions(false);
     setUploadError(null);
     const f = e.target.files?.[0] ?? null;
     setFile(f);
+    if (!f) setBeatRightsConfirmed(false);
   };
 
   const handleUpload = async () => {
@@ -1550,6 +1558,13 @@ setLoadingSubmissions(false);
 
     if (!file) {
       setUploadError("Please choose an audio file first.");
+      return;
+    }
+
+    if (!beatRightsConfirmed) {
+      setUploadError(
+        "Please confirm that you created this beat or have permission to upload it before submitting."
+      );
       return;
     }
 
@@ -1606,6 +1621,10 @@ setLoadingSubmissions(false);
             user_id: user.id,
             audio_path: path,
             created_at: new Date().toISOString(),
+            rights_confirmed: true,
+            rights_confirmed_at: new Date().toISOString(),
+            rights_agreement_version: BATTLE_UPLOAD_RIGHTS_AGREEMENT_VERSION,
+            rights_agreement_text: BATTLE_UPLOAD_RIGHTS_AGREEMENT,
           },
           {
             onConflict: "battle_id,user_id",
@@ -2271,10 +2290,26 @@ useEffect(() => {
                 />
               </div>
 
+              <label className="battle-upload-rights-check">
+                <input
+                  type="checkbox"
+                  checked={beatRightsConfirmed}
+                  onChange={(event) => setBeatRightsConfirmed(event.target.checked)}
+                  disabled={!uploadWindowOpen || uploading || uploadDone || !file}
+                />
+                <span>{BATTLE_UPLOAD_RIGHTS_AGREEMENT}</span>
+              </label>
+
               <button
                 onClick={handleUpload}
                 className="btn-primary battle-upload-button"
-                disabled={!uploadWindowOpen || uploading || uploadDone || !file}
+                disabled={
+                  !uploadWindowOpen ||
+                  uploading ||
+                  uploadDone ||
+                  !file ||
+                  !beatRightsConfirmed
+                }
               >
                 {uploading ? "Uploading..." : uploadDone ? "Uploaded" : "Upload Track"}
               </button>

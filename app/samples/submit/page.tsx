@@ -16,8 +16,10 @@ const ACCEPTED_AUDIO_TYPES = [
   "audio/x-m4a",
 ];
 
+const SAMPLE_RIGHTS_AGREEMENT_VERSION = "sample-upload-v1";
+
 const SAMPLE_RIGHTS_AGREEMENT =
-  "I confirm that I created this sample, own or control all necessary rights to it, and have the legal authority to submit it to FL Battles. I also grant FL Battles permission to review, store, stream, display, and, if approved, make this sample available for use in FL Battles competitions. I understand that I am responsible for the content I upload and that samples containing uncleared third-party material may be rejected or removed.";
+  "I represent and warrant that I created this audio, own or control all necessary rights to it, or have obtained all required licenses, permissions, and clearances to upload it to FLBattles. I grant FLBattles a non-exclusive, worldwide, royalty-free license to review, store, host, stream, reproduce, display, and make this audio available as part of FLBattles competitions, voting, rankings, moderation, and related site features. If this audio is approved as a sample, I understand that other FLBattles users may use it within FLBattles competitions to create and submit battle entries. I understand that I am solely responsible for the audio I upload and that FLBattles may reject, remove, disable, or restrict access to any upload at any time if it may violate copyright, site rules, or applicable law.";
 
 function formatFileSize(bytes: number) {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
@@ -118,6 +120,7 @@ export default function SubmitSamplePage() {
           // Rights confirmation record
           rights_confirmed: true,
           rights_confirmed_at: new Date().toISOString(),
+          rights_agreement_version: SAMPLE_RIGHTS_AGREEMENT_VERSION,
           rights_agreement_text: SAMPLE_RIGHTS_AGREEMENT,
         });
 
@@ -253,10 +256,11 @@ export default function SubmitSamplePage() {
                 />
 
                 <label htmlFor="rights-confirmation">
-                  <strong>I own or control the rights to this sample.</strong>
+                  <strong>I own or have permission to upload this audio.</strong>
                   <span>
-                    I created this audio or have permission to submit it for FL
-                    Battles review and competition use.
+                    I created this audio, own the rights to it, or have all
+                    necessary licenses and permissions to submit it for FLBattles
+                    review and competition use.
                   </span>
                 </label>
               </div>

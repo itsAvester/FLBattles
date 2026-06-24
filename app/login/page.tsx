@@ -7,10 +7,20 @@ import { supabase } from "../../lib/supabaseClient";
 
 type Mode = "login" | "signup" | "forgot";
 
+const CURRENT_TERMS_VERSION = "terms-v1";
+const CURRENT_PRIVACY_VERSION = "privacy-v1";
+const CURRENT_COPYRIGHT_POLICY_VERSION = "copyright-policy-v1";
+const CURRENT_BATTLE_RULES_VERSION = "battle-rules-v1";
+
+const SIGNUP_LEGAL_ACCEPTANCE_TEXT =
+  "I am at least 13 years old and agree to the Terms, Privacy Policy, Battle Rules, and Copyright Policy. I understand that I may only upload audio that I created or have permission to use.";
+
+
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -48,6 +58,14 @@ export default function LoginPage() {
       }
 
       if (mode === "signup") {
+        if (!legalAccepted) {
+          throw new Error(
+            "Please confirm your age and accept the Terms, Privacy Policy, Battle Rules, and Copyright Policy."
+          );
+        }
+
+        const acceptedAt = new Date().toISOString();
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -56,17 +74,35 @@ export default function LoginPage() {
         if (error) throw error;
 
         if (data.user) {
-          try {
-            await fetch("/api/create-profile", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                userId: data.user.id,
-                email: data.user.email,
-              }),
-            });
-          } catch {
-            // Non-fatal. Profile creation can be handled elsewhere if needed.
+          const profileResponse = await fetch("/api/create-profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: data.user.id,
+              email: data.user.email,
+              legalAcceptance: {
+                accepted: true,
+                ageConfirmed: true,
+                acceptedAt,
+                termsVersion: CURRENT_TERMS_VERSION,
+                privacyVersion: CURRENT_PRIVACY_VERSION,
+                copyrightPolicyVersion: CURRENT_COPYRIGHT_POLICY_VERSION,
+                battleRulesVersion: CURRENT_BATTLE_RULES_VERSION,
+                acceptanceText: SIGNUP_LEGAL_ACCEPTANCE_TEXT,
+              },
+            }),
+          });
+
+          if (!profileResponse.ok) {
+            let message = "Your account was created, but your profile/legal acceptance record could not be saved.";
+            try {
+              const body = await profileResponse.json();
+              message = body.error || message;
+            } catch {
+              // ignore json parse errors
+            }
+
+            throw new Error(message);
           }
         }
       } else if (mode === "login") {
@@ -92,6 +128,7 @@ export default function LoginPage() {
     setMode(nextMode);
     setErrorMsg(null);
     setSuccessMsg(null);
+    if (nextMode !== "signup") setLegalAccepted(false);
   };
 
   return (
@@ -395,6 +432,37 @@ export default function LoginPage() {
                 </label>
               )}
 
+              {mode === "signup" && (
+                <label className="auth-legal-check">
+                  <input
+                    type="checkbox"
+                    checked={legalAccepted}
+                    onChange={(event) => setLegalAccepted(event.target.checked)}
+                    disabled={submitting}
+                  />
+                  <span>
+                    I am at least 13 years old and agree to the{" "}
+                    <Link href="/legal/terms" target="_blank">
+                      Terms
+                    </Link>
+                    ,{" "}
+                    <Link href="/legal/privacy" target="_blank">
+                      Privacy Policy
+                    </Link>
+                    ,{" "}
+                    <Link href="/legal/battle-rules" target="_blank">
+                      Battle Rules
+                    </Link>
+                    , and{" "}
+                    <Link href="/legal/copyright" target="_blank">
+                      Copyright Policy
+                    </Link>
+                    . I understand that I may only upload audio I created or have
+                    permission to use.
+                  </span>
+                </label>
+              )}
+
               {errorMsg && (
                 <p
                   style={{
@@ -432,7 +500,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={submitting}
+                disabled={submitting || (mode === "signup" && !legalAccepted)}
                 style={{
                   marginTop: 8,
                   alignSelf: "flex-start",

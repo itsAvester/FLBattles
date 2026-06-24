@@ -126,12 +126,12 @@ function getSeasonInfo() {
   };
 }
 
-function formatRating(r: number | null) {
-  return r === null ? "Unranked" : Math.round(r);
+function formatRating(rating: number | null) {
+  return rating === null ? "Unranked" : Math.round(rating);
 }
 
-function formatWinRate(w: number | null) {
-  return w === null ? "—" : `${Number(w).toFixed(1)}%`;
+function formatWinRate(winRate: number | null) {
+  return winRate === null ? "—" : `${Number(winRate).toFixed(1)}%`;
 }
 
 type SeasonSignal = {
@@ -170,7 +170,6 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [searching, setSearching] = useState(false);
 
@@ -194,7 +193,9 @@ export default function LeaderboardPage() {
 
     let allTimeQuery = supabase
       .from("profiles")
-      .select("id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key")
+      .select(
+        "id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key"
+      )
       .gt("total_battles", 0)
       .order("rating", { ascending: false })
       .order("total_battles", { ascending: false })
@@ -237,8 +238,8 @@ export default function LeaderboardPage() {
     loadUser();
   }, []);
 
-  const handleSearch = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSearch = async (event: FormEvent) => {
+    event.preventDefault();
 
     const term = searchTerm.trim();
     setSearching(!!term);
@@ -249,6 +250,10 @@ export default function LeaderboardPage() {
     setSearchTerm("");
     setSearching(false);
     await loadLeaderboards();
+  };
+
+  const switchBoard = (board: BoardKind) => {
+    setActiveBoard(board);
   };
 
   const activeRows = activeBoard === "season" ? seasonRows : allTimeRows;
@@ -264,12 +269,14 @@ export default function LeaderboardPage() {
           eyebrow: `${season.label} Season`,
           title: "Current Season",
           description:
-            "Monthly rankings reset at the start of each month. All-time stats stay permanent.",
-          primaryMetricLabel: "Season points",
+            "Monthly rankings reset at the start of each month. Compete now while the board is still moving.",
+          primaryMetricLabel: "Points",
           poolLabel: "Season pool",
           poolValue: loading ? "—" : seasonRows.length,
           resetLabel: "Resets in",
           resetValue: `${season.daysRemaining}d`,
+          thirdLabel: "Your rank",
+          thirdValue: activeCurrentUserRank ? `#${activeCurrentUserRank}` : "—",
         }
       : {
           eyebrow: "Permanent leaderboard",
@@ -281,97 +288,131 @@ export default function LeaderboardPage() {
           poolValue: loading ? "—" : allTimeRows.length,
           resetLabel: "Format",
           resetValue: "Legacy",
+          thirdLabel: "Your rank",
+          thirdValue: activeCurrentUserRank ? `#${activeCurrentUserRank}` : "—",
         };
 
   return (
-    <section className="page-inner leaderboard-page leaderboard-page-compact">
-      <div className="leaderboard-shell leaderboard-shell-compact">
-        <header className="leaderboard-hero leaderboard-hero-compact">
-          <div>
-            <div className="eyebrow leaderboard-eyebrow leaderboard-eyebrow-compact">
+    <main className="leaderboard-app-page">
+      <section className="page-inner leaderboard-app-shell">
+        <header className="leaderboard-app-header">
+          <div className="leaderboard-app-title-block">
+            <div className="eyebrow leaderboard-app-eyebrow">
               <span className="eyebrow-dot" />
               Ranked producers
             </div>
 
             <h1>Leaderboard</h1>
 
-            <p className="page-description leaderboard-hero-copy leaderboard-hero-copy-compact">
-              Current monthly rankings and all-time legacy for FL Battles producers.
+            <p>
+              Track the current monthly season, compare all-time legends, and jump
+              straight back into ranked battles.
             </p>
           </div>
+
+          <Link href="/battles" className="btn-primary leaderboard-app-cta">
+            Enter Ranked Battle
+          </Link>
         </header>
-
-        <section className="leaderboard-control-panel">
-          <div className="leaderboard-control-topline">
-            <div className="leaderboard-board-tabs" role="tablist" aria-label="Leaderboard type">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeBoard === "season"}
-                className={activeBoard === "season" ? "is-active" : undefined}
-                onClick={() => setActiveBoard("season")}
-              >
-                Current Season
-              </button>
-
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeBoard === "allTime"}
-                className={activeBoard === "allTime" ? "is-active" : undefined}
-                onClick={() => setActiveBoard("allTime")}
-              >
-                All-Time
-              </button>
-            </div>
-
-            <Link href="/battles" className="btn-primary leaderboard-enter-battle-button">
-              Enter Ranked Battle
-            </Link>
-          </div>
-
-          <div className="leaderboard-active-summary">
-            <div className="leaderboard-active-copy">
-              <span>{activeBoardCopy.eyebrow}</span>
-              <h2>{activeBoardCopy.title}</h2>
-              <p>{activeBoardCopy.description}</p>
-            </div>
-
-            <div className="leaderboard-active-stats">
-              <StatTile label={activeBoardCopy.poolLabel} value={activeBoardCopy.poolValue} />
-              <StatTile label={activeBoardCopy.resetLabel} value={activeBoardCopy.resetValue} />
-              <StatTile
-                label="Your rank"
-                value={activeCurrentUserRank ? `#${activeCurrentUserRank}` : "—"}
-              />
-            </div>
-          </div>
-
-          <form onSubmit={handleSearch} className="leaderboard-search leaderboard-search-compact">
-            <input
-              type="text"
-              placeholder="Search players by name."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-
-            <button type="submit" className="btn-secondary">
-              {loading && searching ? "Searching..." : "Search"}
-            </button>
-
-            {searching && (
-              <button type="button" className="btn-secondary" onClick={clearSearch}>
-                Clear
-              </button>
-            )}
-          </form>
-        </section>
 
         {errorMsg && !loading && (
           <div className="leaderboard-message leaderboard-message-error">
             {errorMsg}
           </div>
         )}
+
+        <nav className="leaderboard-app-tabs" aria-label="Leaderboard views">
+          <button
+            type="button"
+            className={
+              activeBoard === "season"
+                ? "leaderboard-app-tab leaderboard-app-tab-active"
+                : "leaderboard-app-tab"
+            }
+            onClick={() => switchBoard("season")}
+            aria-pressed={activeBoard === "season"}
+          >
+            <span className="leaderboard-app-tab-index">01</span>
+
+            <span className="leaderboard-app-tab-copy">
+              <strong>Current season</strong>
+              <em>Monthly points · resets in {season.daysRemaining}d</em>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={
+              activeBoard === "allTime"
+                ? "leaderboard-app-tab leaderboard-app-tab-active"
+                : "leaderboard-app-tab"
+            }
+            onClick={() => switchBoard("allTime")}
+            aria-pressed={activeBoard === "allTime"}
+          >
+            <span className="leaderboard-app-tab-index">02</span>
+
+            <span className="leaderboard-app-tab-copy">
+              <strong>All-time board</strong>
+              <em>Permanent rating · legacy ranks</em>
+            </span>
+          </button>
+        </nav>
+
+        <section className="leaderboard-app-panel">
+          <div className="leaderboard-app-panel-inner">
+            <div className="leaderboard-app-panel-main">
+              <span className="leaderboard-app-pill">{activeBoardCopy.eyebrow}</span>
+
+              <h2>{activeBoardCopy.title}</h2>
+
+              <p>{activeBoardCopy.description}</p>
+
+              <form onSubmit={handleSearch} className="leaderboard-app-search">
+                <input
+                  type="text"
+                  placeholder="Search players by name."
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                />
+
+                <button type="submit" className="btn-secondary">
+                  {loading && searching ? "Searching..." : "Search"}
+                </button>
+
+                {searching && (
+                  <button type="button" className="btn-secondary" onClick={clearSearch}>
+                    Clear
+                  </button>
+                )}
+              </form>
+            </div>
+
+            <div className="leaderboard-app-meta-stack">
+              <div className="leaderboard-app-meta-grid">
+                <StatTile label={activeBoardCopy.poolLabel} value={activeBoardCopy.poolValue} />
+                <StatTile label={activeBoardCopy.resetLabel} value={activeBoardCopy.resetValue} />
+                <StatTile label={activeBoardCopy.thirdLabel} value={activeBoardCopy.thirdValue} />
+              </div>
+
+              <div className="leaderboard-app-chip-row">
+                {activeBoard === "season" ? (
+                  <>
+                    <span>New players</span>
+                    <span>Rank movement</span>
+                    <span>Win streaks</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Permanent stats</span>
+                    <span>Legacy rating</span>
+                    <span>Career battles</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
 
         <LeaderboardBoard
           kind={activeBoard}
@@ -382,14 +423,16 @@ export default function LeaderboardPage() {
           primaryMetricLabel={activeBoardCopy.primaryMetricLabel}
           emptyMessage={
             searching
-              ? `No ${activeBoard === "season" ? "current-season" : "all-time"} players matched that search.`
+              ? `No ${
+                  activeBoard === "season" ? "current-season" : "all-time"
+                } players matched that search.`
               : activeBoard === "season"
                 ? "No ranked battles have been counted for this season yet."
                 : "No all-time ranked players found."
           }
         />
-      </div>
-    </section>
+      </section>
+    </main>
   );
 }
 
@@ -415,14 +458,14 @@ function LeaderboardBoard({
   const tableRows = !searching ? rankedRows.slice(3) : rankedRows;
 
   return (
-    <section className={`leaderboard-board leaderboard-board-active leaderboard-board-${kind}`}>
+    <section className={`leaderboard-app-board leaderboard-app-board-${kind}`}>
       {!loading && podiumRows.length > 0 && (
-        <div className="leaderboard-podium-grid leaderboard-podium-grid-compact">
-          {podiumRows.map((player, idx) => (
+        <div className="leaderboard-app-podium-grid">
+          {podiumRows.map((player, index) => (
             <PodiumCard
               key={`${kind}-${player.id}`}
               player={player}
-              rank={idx + 1}
+              rank={index + 1}
               kind={kind}
             />
           ))}
@@ -464,25 +507,25 @@ function PodiumCard({
   return (
     <Link
       href={`/players/${player.id}`}
-      className={`leaderboard-podium-card leaderboard-podium-card-compact ${
-        isChampion ? "leaderboard-podium-card-champion" : ""
+      className={`leaderboard-app-podium-card ${
+        isChampion ? "leaderboard-app-podium-card-champion" : ""
       }`}
     >
-      <div className="leaderboard-podium-bg-number">{rank}</div>
+      <div className="leaderboard-app-podium-bg-number">{rank}</div>
 
-      <div className="leaderboard-podium-topline">
-        <span className="leaderboard-rank-bubble">#{rank}</span>
+      <div className="leaderboard-app-podium-topline">
+        <span className="leaderboard-app-rank-bubble">#{rank}</span>
         <BadgeIcon badgeKey={player.selected_badge_key} size={30} />
       </div>
 
-      <div className="leaderboard-podium-body">
+      <div className="leaderboard-app-podium-body">
         <RankPill label={statusLabel} />
 
         <h3>{getDisplayName(player)}</h3>
 
         <SeasonSignalRow kind={kind} player={player} />
 
-        <div className="leaderboard-mini-stat-grid leaderboard-mini-stat-grid-compact">
+        <div className="leaderboard-app-mini-stat-grid">
           <MiniStat label={kind === "season" ? "Points" : "Rating"} value={formatRating(player.rating)} />
           <MiniStat label="WR" value={formatWinRate(player.win_rate)} />
           <MiniStat label="Battles" value={player.total_battles ?? 0} />
@@ -510,7 +553,7 @@ function LeaderboardTable({
   primaryMetricLabel: string;
 }) {
   return (
-    <div className="leaderboard-table-card leaderboard-table-card-compact">
+    <div className="leaderboard-app-table-card">
       {loading && (
         <p className="leaderboard-message">
           Loading {kind === "season" ? "current season" : "all-time"} leaderboard...
@@ -522,7 +565,7 @@ function LeaderboardTable({
       )}
 
       {!loading && rows.length > 0 && (
-        <div className="leaderboard-table-wrap">
+        <div className="leaderboard-table-wrap leaderboard-app-table-wrap">
           <table>
             <thead>
               <tr>
@@ -535,8 +578,8 @@ function LeaderboardTable({
             </thead>
 
             <tbody>
-              {rows.map((player, idx) => {
-                const rank = startRank + idx;
+              {rows.map((player, index) => {
+                const rank = startRank + index;
                 const name = getDisplayName(player);
                 const isCurrentUser = player.id === currentUserId;
                 const rankLabel =
@@ -556,9 +599,10 @@ function LeaderboardTable({
                     <td style={tdLeftMutedStyle}>{rank}</td>
 
                     <td style={tdNameStyle}>
-                      <Link href={`/players/${player.id}`} className="leaderboard-player-cell">
+                      <Link href={`/players/${player.id}`} className="leaderboard-player-cell leaderboard-app-player-cell">
                         <RankPill label={rankLabel} compact />
                         <BadgeIcon badgeKey={player.selected_badge_key} size={26} />
+
                         <div className="leaderboard-player-main">
                           <span className="leaderboard-player-name-line">
                             {name}
@@ -620,7 +664,7 @@ function SeasonSignalRow({
 
 function StatTile({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="leaderboard-stat-tile leaderboard-stat-tile-compact">
+    <div className="leaderboard-app-stat-tile">
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -662,7 +706,7 @@ function MiniStat({
   value: string | number;
 }) {
   return (
-    <div className="leaderboard-mini-stat">
+    <div className="leaderboard-app-mini-stat">
       <div>{label}</div>
       <strong>{value}</strong>
     </div>
@@ -671,9 +715,9 @@ function MiniStat({
 
 const thLeftStyle: CSSProperties = {
   textAlign: "left",
-  padding: "11px 16px",
+  padding: "10px 15px",
   color: "rgba(255,255,255,0.52)",
-  fontSize: "0.66rem",
+  fontSize: "0.64rem",
   fontWeight: 950,
   textTransform: "uppercase",
   letterSpacing: "0.13em",
@@ -685,21 +729,21 @@ const thRightStyle: CSSProperties = {
 };
 
 const tdLeftMutedStyle: CSSProperties = {
-  padding: "11px 16px",
+  padding: "10px 15px",
   color: "rgba(255,255,255,0.56)",
   fontWeight: 950,
   fontVariantNumeric: "tabular-nums",
 };
 
 const tdNameStyle: CSSProperties = {
-  padding: "11px 16px",
+  padding: "10px 15px",
   color: "var(--text)",
   fontWeight: 850,
   minWidth: 280,
 };
 
 const tdRightStyle: CSSProperties = {
-  padding: "11px 16px",
+  padding: "10px 15px",
   textAlign: "right",
   color: "rgba(255,255,255,0.84)",
   fontWeight: 760,

@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
 import { computeRankTier, RankTier } from "../../lib/rankUtils";
-import { BADGE_LIST, BadgeIcon, getBadgeByKey, type BadgeMeta } from "../../lib/badges";
+import {
+  BADGE_LIST,
+  BadgeIcon,
+  getBadgeByKey,
+  type BadgeMeta,
+} from "../../lib/badges";
 
 type ProfileRow = {
   id: string;
@@ -31,6 +36,14 @@ type SampleCounts = {
   total: number;
 };
 
+type ProfileModule =
+  | "overview"
+  | "badges"
+  | "stats"
+  | "samples"
+  | "edit"
+  | "security";
+
 export default function ProfilePage() {
   const router = useRouter();
 
@@ -50,6 +63,8 @@ export default function ProfilePage() {
   const [rankTier, setRankTier] = useState<RankTier>("Unranked");
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [unlockedBadges, setUnlockedBadges] = useState<UserBadgeRow[]>([]);
+  const [activeModule, setActiveModule] = useState<ProfileModule>("overview");
+
   const [sampleCounts, setSampleCounts] = useState<SampleCounts>({
     pending: 0,
     approved: 0,
@@ -272,17 +287,19 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <section className="page-inner profile-page-shell">
-        <div className="eyebrow">
-          <span className="eyebrow-dot" />
-          Profile terminal
-        </div>
+      <section className="page-inner profile-hub-page">
+        <div className="card profile-hub-loading">
+          <div className="eyebrow">
+            <span className="eyebrow-dot" />
+            Profile terminal
+          </div>
 
-        <h1 className="profile-page-title">Loading Profile</h1>
+          <h1>Loading profile</h1>
 
-        <div className="queue-status">
-          <span className="spinner" />
-          <span>Fetching account stats and rank data.</span>
+          <div className="queue-status">
+            <span className="spinner" />
+            <span>Fetching account stats and rank data.</span>
+          </div>
         </div>
       </section>
     );
@@ -290,23 +307,44 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <section className="page-inner profile-page-shell">
-        <div className="eyebrow">
-          <span className="eyebrow-dot" />
-          Profile terminal
+      <section className="page-inner profile-hub-page">
+        <div className="card profile-hub-loading">
+          <div className="eyebrow">
+            <span className="eyebrow-dot" />
+            Profile terminal
+          </div>
+
+          <h1>No profile found</h1>
+
+          <p>
+            Try logging out and back in. If this keeps happening, your profile
+            row may need to be recreated in Supabase.
+          </p>
         </div>
-
-        <h1 className="profile-page-title">No Profile Found</h1>
-
-        <p className="profile-page-description">
-          Try logging out and back in. If this keeps happening, your profile row
-          may need to be recreated in Supabase.
-        </p>
       </section>
     );
   }
 
-  const topStats = [
+  const quickStats = [
+    {
+      label: "Rating",
+      value: formatRating(profile.rating),
+    },
+    {
+      label: "Rank",
+      value: formatRankPosition(globalRank),
+    },
+    {
+      label: "Win Rate",
+      value: formatWinRate(profile.win_rate),
+    },
+    {
+      label: "Battles",
+      value: profile.total_battles ?? 0,
+    },
+  ];
+
+  const overviewCards = [
     {
       label: "Rating",
       value: formatRating(profile.rating),
@@ -320,7 +358,7 @@ export default function ProfilePage() {
     {
       label: "Win Rate",
       value: formatWinRate(profile.win_rate),
-      subtext: `${profile.total_battles ?? 0} battles`,
+      subtext: `${profile.total_battles ?? 0} battles played`,
     },
     {
       label: "Samples",
@@ -343,24 +381,92 @@ export default function ProfilePage() {
     ["Rejected", sampleCounts.rejected],
   ];
 
+  const modules: {
+    key: ProfileModule;
+    label: string;
+    eyebrow: string;
+    title: string;
+    description: string;
+  }[] = [
+    {
+      key: "overview",
+      label: "Overview",
+      eyebrow: "Account snapshot",
+      title: "Overview",
+      description:
+        "Your producer identity, rank, badge, and quick account actions.",
+    },
+    {
+      key: "badges",
+      label: "Badges",
+      eyebrow: "Display identity",
+      title: "Badges",
+      description:
+        "Choose the badge that appears beside your name on the ladder.",
+    },
+    {
+      key: "stats",
+      label: "Battle Stats",
+      eyebrow: "Competitive profile",
+      title: "Battle Stats",
+      description:
+        "Track your current ladder position and ranked battle record.",
+    },
+    {
+      key: "samples",
+      label: "Samples",
+      eyebrow: "Your contributions",
+      title: "Samples",
+      description:
+        "Review the samples you have submitted for future battles.",
+    },
+    {
+      key: "edit",
+      label: "Edit Profile",
+      eyebrow: "Producer links",
+      title: "Edit Profile",
+      description:
+        "Update your public display name and music profile links.",
+    },
+    {
+      key: "security",
+      label: "Security",
+      eyebrow: "Account access",
+      title: "Security",
+      description: "Manage password access for your FL Battles account.",
+    },
+  ];
+
+  const activeModuleMeta =
+    modules.find((module) => module.key === activeModule) ?? modules[0];
+
   return (
-    <section className="page-inner profile-page-shell">
-      <div className="profile-hero-compact">
-        <div>
+    <section className="page-inner profile-hub-page">
+      <div className="profile-hub-header">
+        <div className="profile-hub-title-block">
           <div className="eyebrow">
             <span className="eyebrow-dot" />
             Player profile · account hub
           </div>
 
-          <h1 className="profile-page-title">Profile</h1>
+          <div className="profile-hub-name-row">
+            <BadgeIcon
+              badgeKey={profile.selected_badge_key}
+              size={46}
+              selected
+            />
 
-          <p className="profile-page-description">
-            {producerName} · {rankTier} · {formatRankPosition(globalRank)}{" "}
-            Global · {formatRating(profile.rating)} Rating
-          </p>
+            <div>
+              <h1>{producerName}</h1>
+              <p>
+                {rankTier} · {formatRankPosition(globalRank)} Global ·{" "}
+                {formatRating(profile.rating)} Rating
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="profile-hero-actions">
+        <div className="profile-hub-actions">
           <Link href="/leaderboard" className="btn-secondary">
             View Ladder
           </Link>
@@ -371,384 +477,368 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {errorMsg && <p className="profile-error-message">{errorMsg}</p>}
+      {errorMsg && <p className="profile-hub-error">{errorMsg}</p>}
 
-      <div className="profile-top-stat-grid">
-        {topStats.map((stat) => (
-          <div className="profile-top-stat-card" key={stat.label}>
-            <span>{stat.label}</span>
-            <strong>{stat.value}</strong>
-            <small>{stat.subtext}</small>
-          </div>
-        ))}
-      </div>
-
-      <div
-        className="card profile-card"
-        style={{
-          overflow: "hidden",
-          marginTop: 18,
-        }}
-      >
-        <div className="profile-card-header">
-          <p className="panel-label">Badge collection</p>
-          <span className="sample-badge">
-            {unlockedCount}/{BADGE_LIST.length} unlocked
-          </span>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 1.1fr)",
-            gap: 18,
-            alignItems: "start",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          <div>
-            <h2>Choose your display icon</h2>
-
-            <p className="profile-card-copy">
-              Pick one unlocked badge to appear beside your name on the
-              leaderboard. Locked badges stay visible so you know what to chase
-              next.
-            </p>
-
-            <div
-              style={{
-                marginTop: 18,
-                padding: 16,
-                border: "1px solid rgba(255,255,255,0.1)",
-                background:
-                  "linear-gradient(90deg, rgba(255,77,28,0.08), rgba(255,255,255,0.025))",
-                borderRadius: 16,
-                display: "flex",
-                gap: 14,
-                alignItems: "center",
-              }}
-            >
-              <BadgeIcon badgeKey={profile.selected_badge_key} size={44} selected />
+      <div className="profile-hub-layout">
+        <aside className="card profile-hub-sidebar">
+          <div className="profile-hub-sidebar-inner">
+            <div className="profile-hub-mini-profile">
+              <BadgeIcon
+                badgeKey={profile.selected_badge_key}
+                size={54}
+                selected
+              />
 
               <div>
-                <p
-                  style={{
-                    margin: "0 0 5px",
-                    color: "rgba(255,255,255,0.42)",
-                    fontSize: "0.68rem",
-                    fontWeight: 950,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.14em",
-                  }}
-                >
-                  Current display badge
-                </p>
-
-                <strong
-                  style={{
-                    color: "var(--text)",
-                    fontSize: "1rem",
-                  }}
-                >
-                  {selectedBadge?.name ?? "Default Producer"}
-                </strong>
+                <strong>{producerName}</strong>
+                <span>{rankTier}</span>
               </div>
             </div>
 
-            {badgeMessage && (
-              <p
-                style={{
-                  margin: "14px 0 0",
-                  color: "rgba(140,255,107,0.88)",
-                  fontWeight: 800,
-                  lineHeight: 1.5,
-                }}
-              >
-                {badgeMessage}
-              </p>
+            <div className="profile-hub-mini-stats">
+              {quickStats.map((stat) => (
+                <div key={stat.label}>
+                  <span>{stat.label}</span>
+                  <strong>{stat.value}</strong>
+                </div>
+              ))}
+            </div>
+
+            <nav className="profile-hub-nav" aria-label="Profile modules">
+              {modules.map((module) => (
+                <button
+                  key={module.key}
+                  type="button"
+                  className={
+                    activeModule === module.key
+                      ? "profile-hub-nav-item profile-hub-nav-item-active"
+                      : "profile-hub-nav-item"
+                  }
+                  onClick={() => setActiveModule(module.key)}
+                >
+                  <span>{module.label}</span>
+                  <em>
+                    {module.key === "badges"
+                      ? `${unlockedCount}/${BADGE_LIST.length}`
+                      : module.key === "samples"
+                        ? `${sampleCounts.total}`
+                        : module.key === "stats"
+                          ? formatRankPosition(globalRank)
+                          : "Open"}
+                  </em>
+                </button>
+              ))}
+            </nav>
+          </div>
+        </aside>
+
+        <main className="card profile-hub-main">
+          <div className="profile-hub-main-header">
+            <div>
+              <p className="panel-label">{activeModuleMeta.eyebrow}</p>
+              <h2>{activeModuleMeta.title}</h2>
+              <p>{activeModuleMeta.description}</p>
+            </div>
+
+            <span className="profile-hub-status-pill">
+              {activeModule === "badges"
+                ? `${unlockedCount}/${BADGE_LIST.length} unlocked`
+                : activeModule === "samples"
+                  ? "Samples"
+                  : activeModule === "security"
+                    ? "Password"
+                    : "Live"}
+            </span>
+          </div>
+
+          <div className="profile-hub-module">
+            {activeModule === "overview" && (
+              <div className="profile-hub-overview">
+                <div className="profile-hub-overview-grid">
+                  {overviewCards.map((stat) => (
+                    <div className="profile-hub-stat-card" key={stat.label}>
+                      <span>{stat.label}</span>
+                      <strong>{stat.value}</strong>
+                      <small>{stat.subtext}</small>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="profile-hub-overview-split">
+                  <div className="profile-hub-feature-card">
+                    <p className="panel-label">Current display badge</p>
+
+                    <div className="profile-hub-current-badge">
+                      <BadgeIcon
+                        badgeKey={profile.selected_badge_key}
+                        size={56}
+                        selected
+                      />
+
+                      <div>
+                        <strong>
+                          {selectedBadge?.name ?? "Default Producer"}
+                        </strong>
+                        <span>
+                          {selectedBadge?.description ??
+                            "Your default producer badge is active."}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn-secondary profile-hub-inline-button"
+                      onClick={() => setActiveModule("badges")}
+                    >
+                      Change Badge
+                    </button>
+                  </div>
+
+                  <div className="profile-hub-feature-card">
+                    <p className="panel-label">Quick actions</p>
+
+                    <div className="profile-hub-action-stack">
+                      <Link href="/battles" className="btn-primary">
+                        Battle Now
+                      </Link>
+
+                      <Link href="/samples/submit" className="btn-secondary">
+                        Submit Sample
+                      </Link>
+
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => setActiveModule("edit")}
+                      >
+                        Edit Profile
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeModule === "badges" && (
+              <div className="profile-hub-badges">
+                <div className="profile-hub-badge-summary">
+                  <div>
+                    <p className="panel-label">Selected badge</p>
+
+                    <div className="profile-hub-current-badge">
+                      <BadgeIcon
+                        badgeKey={profile.selected_badge_key}
+                        size={58}
+                        selected
+                      />
+
+                      <div>
+                        <strong>
+                          {selectedBadge?.name ?? "Default Producer"}
+                        </strong>
+                        <span>
+                          Pick one unlocked badge to appear beside your name on
+                          the leaderboard.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {badgeMessage && (
+                    <p className="profile-hub-success-message">
+                      {badgeMessage}
+                    </p>
+                  )}
+                </div>
+
+                <div className="profile-hub-badge-grid">
+                  {BADGE_LIST.map((badge) => {
+                    const isUnlocked = unlockedBadgeKeys.has(badge.key);
+                    const isSelected = profile.selected_badge_key === badge.key;
+                    const isSavingThis = badgeSaving === badge.key;
+
+                    return (
+                      <button
+                        key={badge.key}
+                        type="button"
+                        onClick={() => handleSelectBadge(badge)}
+                        disabled={!isUnlocked || isSelected || !!badgeSaving}
+                        title={
+                          isUnlocked
+                            ? `Select ${badge.name}`
+                            : `Locked: ${badge.unlockText}`
+                        }
+                        className={
+                          isSelected
+                            ? "profile-hub-badge-card profile-hub-badge-card-selected"
+                            : isUnlocked
+                              ? "profile-hub-badge-card"
+                              : "profile-hub-badge-card profile-hub-badge-card-locked"
+                        }
+                      >
+                        <BadgeIcon
+                          badgeKey={badge.key}
+                          size={44}
+                          locked={!isUnlocked}
+                          selected={isSelected}
+                        />
+
+                        <span>
+                          <strong>
+                            {badge.name}
+                            {isSelected && <em>Selected</em>}
+                          </strong>
+
+                          <small>
+                            {isSavingThis
+                              ? "Saving..."
+                              : isUnlocked
+                                ? badge.description
+                                : badge.unlockText}
+                          </small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {activeModule === "stats" && (
+              <div className="profile-hub-stats">
+                <div className="profile-hub-feature-card profile-hub-rank-card">
+                  <p className="panel-label">Current ladder position</p>
+                  <strong>{formatRankPosition(globalRank)}</strong>
+                  <span>
+                    {rankTier} · {formatRating(profile.rating)} rating
+                  </span>
+                </div>
+
+                <div className="profile-data-list profile-hub-data-list">
+                  {competitiveRows.map(([label, value]) => (
+                    <div className="profile-data-row" key={label}>
+                      <span>{label}</span>
+                      <strong>{value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeModule === "samples" && (
+              <div className="profile-hub-samples">
+                <div className="profile-sample-stat-grid profile-hub-sample-grid">
+                  {sampleStats.map(([label, value]) => (
+                    <div className="profile-sample-stat" key={label}>
+                      <strong>{value}</strong>
+                      <span>{label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="profile-total-submitted-row profile-hub-total-row">
+                  <div>
+                    <span>Total submitted</span>
+                    <strong>{sampleCounts.total}</strong>
+                  </div>
+
+                  <Link href="/samples/submit" className="btn-secondary">
+                    Submit New
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {activeModule === "edit" && (
+              <div className="profile-hub-edit">
+                {userEmail && (
+                  <div className="profile-email-pill profile-hub-email-pill">
+                    <span>Email</span>
+                    <strong>{userEmail}</strong>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveProfile} className="profile-form">
+                  <div className="profile-form-grid profile-hub-form-grid">
+                    <label className="profile-field">
+                      <span>Display Name</span>
+                      <input
+                        type="text"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        maxLength={32}
+                        placeholder="Your producer name"
+                      />
+                    </label>
+
+                    <label className="profile-field">
+                      <span>Spotify URL</span>
+                      <input
+                        type="url"
+                        placeholder="https://open.spotify.com/artist/..."
+                        value={spotifyUrl}
+                        onChange={(e) => setSpotifyUrl(e.target.value)}
+                      />
+                    </label>
+
+                    <label className="profile-field">
+                      <span>SoundCloud URL</span>
+                      <input
+                        type="url"
+                        placeholder="https://soundcloud.com/yourname"
+                        value={soundcloudUrl}
+                        onChange={(e) => setSoundcloudUrl(e.target.value)}
+                      />
+                    </label>
+
+                    <label className="profile-field">
+                      <span>YouTube URL</span>
+                      <input
+                        type="url"
+                        placeholder="https://www.youtube.com/@yourchannel"
+                        value={youtubeUrl}
+                        onChange={(e) => setYoutubeUrl(e.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="profile-form-footer profile-hub-form-footer">
+                    <button
+                      type="submit"
+                      className="btn-primary"
+                      disabled={saving}
+                    >
+                      {saving ? "Saving..." : "Save Profile"}
+                    </button>
+
+                    <p>
+                      Links are normalized automatically, so you can paste them
+                      with or without <code>https://</code>.
+                    </p>
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {activeModule === "security" && (
+              <div className="profile-hub-security">
+                <div className="profile-hub-feature-card">
+                  <p className="panel-label">Password access</p>
+                  <h3>Secure your account</h3>
+                  <p>
+                    Update your password to keep your FL Battles account
+                    protected.
+                  </p>
+
+                  <Link href="/change-password" className="btn-secondary">
+                    Change Password
+                  </Link>
+                </div>
+              </div>
             )}
           </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              gap: 10,
-            }}
-          >
-            {BADGE_LIST.map((badge) => {
-              const isUnlocked = unlockedBadgeKeys.has(badge.key);
-              const isSelected = profile.selected_badge_key === badge.key;
-              const isSavingThis = badgeSaving === badge.key;
-
-              return (
-                <button
-                  key={badge.key}
-                  type="button"
-                  onClick={() => handleSelectBadge(badge)}
-                  disabled={!isUnlocked || isSelected || !!badgeSaving}
-                  title={
-                    isUnlocked
-                      ? `Select ${badge.name}`
-                      : `Locked: ${badge.unlockText}`
-                  }
-                  style={{
-                    minHeight: 0,
-                    display: "grid",
-                    gridTemplateColumns: "44px 1fr",
-                    gap: 12,
-                    alignItems: "center",
-                    padding: 12,
-                    textAlign: "left",
-                    borderRadius: 16,
-                    border: isSelected
-                      ? "1px solid rgba(140,255,107,0.42)"
-                      : isUnlocked
-                        ? "1px solid rgba(255,255,255,0.12)"
-                        : "1px solid rgba(255,255,255,0.07)",
-                    background: isSelected
-                      ? "linear-gradient(90deg, rgba(140,255,107,0.1), rgba(255,255,255,0.035))"
-                      : isUnlocked
-                        ? "rgba(255,255,255,0.035)"
-                        : "rgba(255,255,255,0.018)",
-                    color: "var(--text)",
-                    cursor:
-                      !isUnlocked || isSelected || !!badgeSaving
-                        ? "default"
-                        : "pointer",
-                    opacity: 1,
-                    transform: "none",
-                  }}
-                >
-                  <BadgeIcon
-                    badgeKey={badge.key}
-                    size={44}
-                    locked={!isUnlocked}
-                    selected={isSelected}
-                  />
-
-                  <span style={{ minWidth: 0 }}>
-                    <span
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 5,
-                      }}
-                    >
-                      <strong
-                        style={{
-                          color: isUnlocked
-                            ? "var(--text)"
-                            : "rgba(255,255,255,0.42)",
-                          fontSize: "0.9rem",
-                          lineHeight: 1.15,
-                          letterSpacing: "-0.02em",
-                        }}
-                      >
-                        {badge.name}
-                      </strong>
-
-                      {isSelected && (
-                        <span
-                          style={{
-                            color: "rgba(140,255,107,0.88)",
-                            fontSize: "0.58rem",
-                            fontWeight: 950,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.12em",
-                          }}
-                        >
-                          Selected
-                        </span>
-                      )}
-                    </span>
-
-                    <span
-                      style={{
-                        display: "block",
-                        color: isUnlocked
-                          ? "rgba(255,255,255,0.56)"
-                          : "rgba(255,255,255,0.34)",
-                        fontSize: "0.74rem",
-                        fontWeight: 700,
-                        lineHeight: 1.35,
-                        textTransform: "none",
-                        letterSpacing: 0,
-                      }}
-                    >
-                      {isSavingThis
-                        ? "Saving..."
-                        : isUnlocked
-                          ? badge.description
-                          : badge.unlockText}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="profile-main-grid">
-        <div className="card profile-card profile-competitive-card">
-          <div className="profile-card-header">
-            <p className="panel-label">Competitive profile</p>
-            <span className="sample-badge">Live</span>
-          </div>
-
-          <h2>Rank & battle stats</h2>
-
-          <p className="profile-card-copy">
-            Track your current ladder position, rating, battle history, and win
-            rate from ranked sample-flip battles.
-          </p>
-
-          <div className="profile-data-list">
-            {competitiveRows.map(([label, value]) => (
-              <div className="profile-data-row" key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card profile-card profile-samples-card">
-          <div className="profile-card-header">
-            <p className="panel-label">Your contributions</p>
-            <span className="sample-badge">Samples</span>
-          </div>
-
-          <h2>Submitted samples</h2>
-
-          <p className="profile-card-copy">
-            Track the samples you have submitted for future FL Battles.
-          </p>
-
-          <div className="profile-sample-stat-grid">
-            {sampleStats.map(([label, value]) => (
-              <div className="profile-sample-stat" key={label}>
-                <strong>{value}</strong>
-                <span>{label}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="profile-total-submitted-row">
-            <div>
-              <span>Total submitted</span>
-              <strong>{sampleCounts.total}</strong>
-            </div>
-
-            <Link href="/samples/submit" className="btn-secondary">
-              Submit New
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <div className="card profile-card profile-edit-card">
-        <div className="profile-card-header">
-          <p className="panel-label">Account info</p>
-          <span className="sample-badge">Editable</span>
-        </div>
-
-        <div className="profile-edit-head">
-          <div>
-            <h2>Edit profile</h2>
-
-            <p className="profile-card-copy">
-              Update your producer name and music links shown around your FL
-              Battles account.
-            </p>
-          </div>
-
-          {userEmail && (
-            <div className="profile-email-pill">
-              <span>Email</span>
-              <strong>{userEmail}</strong>
-            </div>
-          )}
-        </div>
-
-        <form onSubmit={handleSaveProfile} className="profile-form">
-          <div className="profile-form-grid">
-            <label className="profile-field">
-              <span>Display Name</span>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                maxLength={32}
-                placeholder="Your producer name"
-              />
-            </label>
-
-            <label className="profile-field">
-              <span>Spotify URL</span>
-              <input
-                type="url"
-                placeholder="https://open.spotify.com/artist/..."
-                value={spotifyUrl}
-                onChange={(e) => setSpotifyUrl(e.target.value)}
-              />
-            </label>
-
-            <label className="profile-field">
-              <span>SoundCloud URL</span>
-              <input
-                type="url"
-                placeholder="https://soundcloud.com/yourname"
-                value={soundcloudUrl}
-                onChange={(e) => setSoundcloudUrl(e.target.value)}
-              />
-            </label>
-
-            <label className="profile-field">
-              <span>YouTube URL</span>
-              <input
-                type="url"
-                placeholder="https://www.youtube.com/@yourchannel"
-                value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
-              />
-            </label>
-          </div>
-
-          <div className="profile-form-footer">
-            <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? "Saving..." : "Save Profile"}
-            </button>
-
-            <p>
-              Links are normalized automatically, so you can paste them with or
-              without <code>https://</code>.
-            </p>
-          </div>
-        </form>
-      </div>
-
-      <div className="card profile-card profile-security-card">
-        <div>
-          <div className="profile-card-header">
-            <p className="panel-label">Account security</p>
-            <span className="profile-danger-badge">Password</span>
-          </div>
-
-          <h2>Secure access</h2>
-
-          <p className="profile-card-copy">
-            Update your password to keep your FL Battles account secure.
-          </p>
-        </div>
-
-        <Link href="/change-password" className="btn-secondary">
-          Change Password
-        </Link>
+        </main>
       </div>
     </section>
   );

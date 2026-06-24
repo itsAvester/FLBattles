@@ -19,6 +19,18 @@ const ACCEPTED_AUDIO_TYPES = [
 const SAMPLE_RIGHTS_AGREEMENT =
   "I confirm that I created this sample, own or control all necessary rights to it, and have the legal authority to submit it to FL Battles. I also grant FL Battles permission to review, store, stream, display, and, if approved, make this sample available for use in FL Battles competitions. I understand that I am responsible for the content I upload and that samples containing uncleared third-party material may be rejected or removed.";
 
+function formatFileSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
+
+  const megabytes = bytes / (1024 * 1024);
+
+  if (megabytes < 1) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  return `${megabytes.toFixed(megabytes >= 10 ? 0 : 1)} MB`;
+}
+
 export default function SubmitSamplePage() {
   const router = useRouter();
 
@@ -129,294 +141,200 @@ export default function SubmitSamplePage() {
   };
 
   return (
-    <main className="page-inner" style={{ paddingTop: 72, paddingBottom: 96 }}>
-      <div className="eyebrow">
-        <span className="eyebrow-dot" />
-        Community samples · review queue
-      </div>
-
-      <h1
-        style={{
-          margin: 0,
-          fontSize: "clamp(3.5rem, 8vw, 7rem)",
-          lineHeight: 0.86,
-          letterSpacing: "-0.075em",
-          fontWeight: 800,
-          color: "var(--text)",
-        }}
-      >
-        Submit a
-        <br />
-        Sample
-      </h1>
-
-      <p
-        className="page-description"
-        style={{
-          maxWidth: 680,
-          marginTop: 24,
-          color: "var(--muted)",
-          fontSize: "1rem",
-          lineHeight: 1.75,
-        }}
-      >
-        Upload a short audio sample for review. If approved, it may be used in
-        future FL Battles.
-      </p>
-
-      <div
-        className="card"
-        style={{
-          maxWidth: 760,
-          marginTop: 34,
-          padding: 26,
-          overflow: "hidden",
-        }}
-      >
-        <span className="card-number">01</span>
-
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 14,
-            marginBottom: 18,
-          }}
-        >
-          <p className="panel-label" style={{ margin: 0 }}>
-            Upload sample
-          </p>
-
-          <span className="sample-badge">Pending Review</span>
-        </div>
-
-        <form
-          onSubmit={handleSubmitSample}
-          style={{
-            position: "relative",
-            zIndex: 1,
-            display: "grid",
-            gap: 16,
-          }}
-        >
-          <label
-            style={{
-              display: "grid",
-              gap: 8,
-              color: "var(--text)",
-              fontWeight: 800,
-            }}
-          >
-            <span
-              style={{
-                color: "var(--muted)",
-                fontSize: "0.72rem",
-                fontWeight: 900,
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
-              }}
-            >
-              Audio file
-            </span>
-
-            <input
-              type="file"
-              accept="audio/*"
-              onChange={(e) => setSampleFile(e.target.files?.[0] ?? null)}
-              style={{
-                width: "100%",
-                padding: "13px 12px",
-                border: "1px solid var(--line-bright)",
-                background: "rgba(5, 5, 5, 0.85)",
-                color: "var(--text)",
-              }}
-            />
-          </label>
-
-          <label
-            style={{
-              display: "grid",
-              gap: 8,
-              color: "var(--text)",
-              fontWeight: 800,
-            }}
-          >
-            <span
-              style={{
-                color: "var(--muted)",
-                fontSize: "0.72rem",
-                fontWeight: 900,
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
-              }}
-            >
-              Notes, optional
-            </span>
-
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add tempo, key, vibe, or anything you want the reviewer to know."
-              rows={4}
-              style={{
-                width: "100%",
-                resize: "vertical",
-                padding: "13px 12px",
-                border: "1px solid var(--line-bright)",
-                background: "rgba(5, 5, 5, 0.85)",
-                color: "var(--text)",
-                outline: "none",
-              }}
-            />
-          </label>
-
-          <section
-            style={{
-              border: "1px solid rgba(255, 255, 255, 0.14)",
-              background:
-                "linear-gradient(135deg, rgba(255, 77, 28, 0.08), rgba(255, 255, 255, 0.035))",
-              padding: 16,
-              display: "grid",
-              gap: 12,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-              }}
-            >
-              <input
-                id="rights-confirmation"
-                type="checkbox"
-                checked={rightsConfirmed}
-                onChange={(e) => setRightsConfirmed(e.target.checked)}
-                disabled={uploading}
-                style={{
-                  marginTop: 4,
-                  width: 18,
-                  height: 18,
-                  accentColor: "var(--accent)",
-                  cursor: uploading ? "not-allowed" : "pointer",
-                  flex: "0 0 auto",
-                }}
-              />
-
-              <label
-                htmlFor="rights-confirmation"
-                style={{
-                  display: "grid",
-                  gap: 8,
-                  cursor: uploading ? "not-allowed" : "pointer",
-                }}
-              >
-                <span
-                  style={{
-                    color: "var(--text)",
-                    fontSize: "0.88rem",
-                    fontWeight: 900,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                  }}
-                >
-                  Rights confirmation required
-                </span>
-
-                <span
-                  style={{
-                    color: "var(--muted)",
-                    fontSize: "0.92rem",
-                    fontWeight: 650,
-                    lineHeight: 1.65,
-                  }}
-                >
-                  {SAMPLE_RIGHTS_AGREEMENT}
-                </span>
-              </label>
+    <main className="sample-submit-shell">
+      <section className="page-inner sample-submit-page">
+        <header className="sample-submit-hero">
+          <div className="sample-submit-hero-copy">
+            <div className="eyebrow">
+              <span className="eyebrow-dot" />
+              Community samples · review queue
             </div>
 
-            <p
-              style={{
-                margin: 0,
-                color: "rgba(255, 255, 255, 0.52)",
-                fontSize: "0.78rem",
-                fontWeight: 650,
-                lineHeight: 1.55,
-              }}
-            >
-              Do not upload copyrighted loops, melodies, drums, vocals, or other
-              audio unless you created them yourself or have permission to submit
-              them for this use.
+            <h1 className="sample-submit-title">Submit a sample.</h1>
+
+            <p className="sample-submit-description">
+              Upload a short, original audio sample for review. Approved samples
+              may appear in future FL Battles.
             </p>
-          </section>
+          </div>
 
-          {errorMsg && (
-            <p
-              style={{
-                margin: 0,
-                color: "#ffd4ca",
-                border: "1px solid rgba(255, 77, 28, 0.45)",
-                background: "rgba(255, 77, 28, 0.075)",
-                fontSize: "0.9rem",
-                fontWeight: 700,
-                lineHeight: 1.45,
-                padding: "10px 12px",
-              }}
-            >
-              {errorMsg}
-            </p>
-          )}
-
-          {successMsg && (
-            <p
-              style={{
-                margin: 0,
-                color: "#d8ffd1",
-                border: "1px solid rgba(119, 255, 102, 0.35)",
-                background: "rgba(119, 255, 102, 0.07)",
-                fontSize: "0.9rem",
-                fontWeight: 700,
-                lineHeight: 1.45,
-                padding: "10px 12px",
-              }}
-            >
-              {successMsg}
-            </p>
-          )}
-
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={uploading || !rightsConfirmed}
-              title={
-                !rightsConfirmed
-                  ? "Confirm that you own or control the rights before submitting."
-                  : undefined
-              }
-              style={{
-                opacity: uploading || !rightsConfirmed ? 0.62 : 1,
-                cursor: uploading || !rightsConfirmed ? "not-allowed" : "pointer",
-              }}
-            >
-              {uploading ? "Submitting..." : "Submit Sample"}
-            </button>
-
+          <div className="sample-submit-hero-actions">
             <button
               type="button"
-              className="btn-secondary"
+              className="btn-secondary sample-submit-secondary-action"
               onClick={() => router.push("/battles")}
               disabled={uploading}
             >
               Back to Battles
             </button>
           </div>
-        </form>
-      </div>
+        </header>
+
+        <div className="sample-submit-grid">
+          <form className="sample-submit-card" onSubmit={handleSubmitSample}>
+            <div className="sample-submit-card-head">
+              <div>
+                <p className="sample-submit-kicker">Upload queue</p>
+                <h2>Send your sample in for review</h2>
+              </div>
+
+              <span className="sample-submit-status-pill">Pending Review</span>
+            </div>
+
+            <div className="sample-submit-dropzone-wrap">
+              <input
+                id="sample-file-input"
+                className="sample-submit-file-input"
+                type="file"
+                accept="audio/*,.mp3,.wav,.aiff,.aif,.flac,.m4a"
+                onChange={(event) => {
+                  setSampleFile(event.target.files?.[0] ?? null);
+                  setErrorMsg(null);
+                  setSuccessMsg(null);
+                }}
+                disabled={uploading}
+              />
+
+              <label
+                htmlFor="sample-file-input"
+                className={
+                  sampleFile
+                    ? "sample-submit-dropzone sample-submit-dropzone-selected"
+                    : "sample-submit-dropzone"
+                }
+              >
+                <span className="sample-submit-dropzone-icon">+</span>
+
+                <span className="sample-submit-dropzone-copy">
+                  <strong>{sampleFile ? sampleFile.name : "Choose audio file"}</strong>
+                  <small>
+                    {sampleFile
+                      ? `${formatFileSize(sampleFile.size)} · ${sampleFile.type || "audio file"}`
+                      : "MP3, WAV, AIFF, FLAC, or M4A · max 50 MB"}
+                  </small>
+                </span>
+
+                <span className="sample-submit-dropzone-action">
+                  {sampleFile ? "Change file" : "Browse"}
+                </span>
+              </label>
+
+              {sampleFile && (
+                <button
+                  type="button"
+                  className="sample-submit-clear-file"
+                  onClick={() => setSampleFile(null)}
+                  disabled={uploading}
+                >
+                  Remove selected file
+                </button>
+              )}
+            </div>
+
+            <label className="sample-submit-field">
+              <span>Notes, optional</span>
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Add tempo, key, vibe, or anything you want the reviewer to know."
+                rows={4}
+                disabled={uploading}
+              />
+            </label>
+
+            <section className="sample-rights-card">
+              <div className="sample-rights-row">
+                <input
+                  id="rights-confirmation"
+                  type="checkbox"
+                  checked={rightsConfirmed}
+                  onChange={(event) => setRightsConfirmed(event.target.checked)}
+                  disabled={uploading}
+                />
+
+                <label htmlFor="rights-confirmation">
+                  <strong>I own or control the rights to this sample.</strong>
+                  <span>
+                    I created this audio or have permission to submit it for FL
+                    Battles review and competition use.
+                  </span>
+                </label>
+              </div>
+
+              <details className="sample-rights-details">
+                <summary>Read full submission agreement</summary>
+                <p>{SAMPLE_RIGHTS_AGREEMENT}</p>
+                <p>
+                  Do not upload copyrighted loops, melodies, drums, vocals, or
+                  other audio unless you created them yourself or have permission
+                  to submit them for this use.
+                </p>
+              </details>
+            </section>
+
+            {errorMsg && <p className="sample-submit-alert sample-submit-alert-error">{errorMsg}</p>}
+            {successMsg && <p className="sample-submit-alert sample-submit-alert-success">{successMsg}</p>}
+
+            <div className="sample-submit-footer-actions">
+              <button
+                type="submit"
+                className="btn-primary sample-submit-primary-action"
+                disabled={uploading || !rightsConfirmed}
+                title={
+                  !rightsConfirmed
+                    ? "Confirm that you own or control the rights before submitting."
+                    : undefined
+                }
+              >
+                {uploading ? "Submitting sample..." : "Submit Sample"}
+              </button>
+            </div>
+          </form>
+
+          <aside className="sample-submit-side-panel" aria-label="Sample submission guidelines">
+            <div className="sample-submit-side-head">
+              <p className="sample-submit-kicker">Before you submit</p>
+              <h2>Make it battle-ready.</h2>
+              <p>
+                Short, clean, original samples are easiest to approve and use in
+                ranked battles.
+              </p>
+            </div>
+
+            <div className="sample-submit-rule-list">
+              <div className="sample-submit-rule">
+                <span>01</span>
+                <div>
+                  <strong>Original audio only</strong>
+                  <p>No uncleared loops, vocals, melodies, or ripped content.</p>
+                </div>
+              </div>
+
+              <div className="sample-submit-rule">
+                <span>02</span>
+                <div>
+                  <strong>Keep it usable</strong>
+                  <p>Submit something producers can flip quickly in a timed battle.</p>
+                </div>
+              </div>
+
+              <div className="sample-submit-rule">
+                <span>03</span>
+                <div>
+                  <strong>Review first</strong>
+                  <p>Approved samples can enter the future battle pool.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="sample-submit-format-card">
+              <span>Accepted formats</span>
+              <strong>MP3 · WAV · AIFF · FLAC · M4A</strong>
+              <small>Maximum file size: 50 MB</small>
+            </div>
+          </aside>
+        </div>
+      </section>
     </main>
   );
 }

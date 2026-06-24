@@ -56,30 +56,6 @@ export default function HomePage() {
           </div>
 
           <div className="fl-home-side-panel">
-            <div className="fl-home-start-card">
-              <div className="fl-home-start-topline">
-                <span>Battle loop</span>
-                <span>Live</span>
-              </div>
-
-              <div className="fl-home-start-steps">
-                <div>
-                  <span>01</span>
-                  <strong>Get a sample</strong>
-                </div>
-
-                <div>
-                  <span>02</span>
-                  <strong>Make a beat</strong>
-                </div>
-
-                <div>
-                  <span>03</span>
-                  <strong>Vote & rank up</strong>
-                </div>
-              </div>
-            </div>
-
             <RecentChampions />
           </div>
         </div>

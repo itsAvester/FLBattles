@@ -401,6 +401,10 @@ const submittedUsersLoadedRef = useRef(false);
   const isHostVoting = lobby?.voting_style === "host";
   const currentUserIsHost = !!currentUserId && currentUserId === lobby?.host_user_id;
   const customVotingOpen = isCustomLobby && lobby?.status === "voting";
+  const currentUserSubmitted =
+    !!currentUserId && submittedUserIds.has(currentUserId);
+  const currentUserCanVote =
+    currentUserSubmitted && (!isHostVoting || currentUserIsHost);
 
   // leaving / penalty
   const [leaving, setLeaving] = useState(false);
@@ -1462,54 +1466,31 @@ setLoadingSubmissions(false);
   useEffect(() => {
     if (phase !== "results") return;
     if (!battleId || !battleId.trim()) return;
-    if (submissions.length === 0) return;
 
     let cancelled = false;
 
     const checkVotes = async () => {
-      const { count, error } = await supabase
-        .from("battle_votes")
-        .select("id", { count: "exact", head: true })
-        .eq("battle_id", battleId);
+      if (isCustomLobby) return;
 
-      if (!isCustomLobby && !error && count != null && !cancelled) {
-        let effectiveVoteCount = count;
-        let requiredVotes = submissions.length <= 1 ? 0 : submissions.length;
-
-        if (isHostVoting) {
-          requiredVotes = submissions.length <= 1 ? 0 : 1;
-
-          const { count: hostVoteCount, error: hostVoteError } = await supabase
-            .from("battle_votes")
-            .select("id", { count: "exact", head: true })
-            .eq("battle_id", battleId)
-            .eq("voter_id", lobby?.host_user_id ?? "");
-
-          if (hostVoteError) {
-            console.error("Failed to check host vote count:", hostVoteError);
-          } else {
-            effectiveVoteCount = hostVoteCount ?? 0;
-          }
+      const { data: finalized, error } = await supabase.rpc(
+        "finalize_battle_if_ready",
+        {
+          p_battle_id: battleId,
         }
+      );
 
-        if (submissions.length === 1 || effectiveVoteCount >= requiredVotes) {
-          const { error: finalizeError } = await supabase.rpc(
-            "finalize_battle_results",
-            {
-              p_battle_id: battleId,
-            }
-          );
+      if (cancelled) return;
 
-          if (finalizeError) {
-            console.error("Failed to finalize battle:", finalizeError);
-            setAllVotesIn(false);
-            setVoteError(finalizeError.message || "Failed to finalize battle.");
-            return;
-          }
+      if (error) {
+        console.error("Failed to check battle finalization:", error);
+        setAllVotesIn(false);
+        setVoteError(error.message || "Failed to check battle finalization.");
+        return;
+      }
 
-          setAllVotesIn(true);
-          router.push(`/battles/${battleId}/results`);
-        }
+      if (finalized) {
+        setAllVotesIn(true);
+        router.push(`/battles/${battleId}/results`);
       }
     };
 
@@ -1520,7 +1501,7 @@ setLoadingSubmissions(false);
       cancelled = true;
       clearInterval(interval);
     };
-  }, [phase, battleId, submissions.length, router, isHostVoting, lobby?.host_user_id, isCustomLobby]);
+  }, [phase, battleId, router, isCustomLobby]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = String(timeLeft % 60).padStart(2, "0");
@@ -1678,23 +1659,39 @@ setLoadingSubmissions(false);
         return;
       }
 
-      const { error } = await supabase.from("battle_votes").insert({
-        battle_id: battleId,
-        voter_id: user.id,
-        submission_user_id: submission.user_id,
+      if (!submittedUserIds.has(user.id)) {
+        setVoteError("Only producers who submitted a beat can vote in this battle.");
+        return;
+      }
+
+      if (submission.user_id === user.id) {
+        setVoteError("You cannot vote for your own beat.");
+        return;
+      }
+
+      const { error } = await supabase.rpc("submit_battle_vote", {
+        p_battle_id: battleId,
+        p_submission_user_id: submission.user_id,
       });
 
       if (error) {
-        if ((error as any).code === "23505") {
-          setVoteError("You already voted in this battle.");
-        } else {
-          setVoteError(error.message || "Failed to record vote.");
-        }
+        setVoteError(error.message || "Failed to record vote.");
         return;
       }
 
       setVotedForUserId(submission.user_id);
       await refreshLobbyState();
+
+      const { data: lobbyAfterVote, error: lobbyAfterVoteError } = await supabase
+        .from("battle_lobbies")
+        .select("status")
+        .eq("id", battleId)
+        .single();
+
+      if (!lobbyAfterVoteError && lobbyAfterVote?.status === "finished") {
+        setAllVotesIn(true);
+        router.push(`/battles/${battleId}/results`);
+      }
     } finally {
       setVoteSubmitting(false);
     }
@@ -2451,6 +2448,24 @@ useEffect(() => {
   </div>
 )}
 
+{currentUserId && !currentUserSubmitted && submissions.length > 0 && (
+  <div
+    style={{
+      marginTop: 12,
+      marginBottom: 12,
+      padding: "12px 14px",
+      border: "1px solid rgba(248, 113, 113, 0.45)",
+      background: "rgba(127, 29, 29, 0.24)",
+      color: "#fca5a5",
+      borderRadius: 12,
+      fontSize: "0.95rem",
+      lineHeight: 1.45,
+    }}
+  >
+    You did not submit a beat for this battle, so you can listen but cannot vote.
+  </div>
+)}
+
 <div
   style={{
     marginTop: 16,
@@ -2471,7 +2486,7 @@ useEffect(() => {
   : sub.displayName;
 
                   const isVoted = votedForUserId === sub.user_id;
-                  const canCurrentUserVote = !sub.isSelf && (!isHostVoting || currentUserIsHost);
+                  const canCurrentUserVote = currentUserCanVote && !sub.isSelf;
 
                   return (
                     <div

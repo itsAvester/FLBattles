@@ -13,7 +13,11 @@ export default function HomePage() {
               Private rooms · ranked seasons · live voting
             </div>
 
-            <h1>Make beats. Battle producers. Climb the board.</h1>
+            <h1 className="fl-home-headline">
+              <span>Make beats.</span>
+              <span>Battle producers.</span>
+              <span>Climb the board.</span>
+            </h1>
 
             <p className="fl-home-description">
               Flip the same sample, upload your beat, vote for a winner, and

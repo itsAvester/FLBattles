@@ -289,9 +289,12 @@ export default function BattlesPage() {
             disabled={isBusy}
             aria-pressed={activeMode === "ranked"}
           >
-            <span>Ranked</span>
-            <strong>Find match</strong>
-            <em>Public queue</em>
+            <span className="battle-app-tab-index">01</span>
+
+            <span className="battle-app-tab-copy">
+              <strong>Ranked match</strong>
+              <em>Public queue · affects rating</em>
+            </span>
           </button>
 
           <button
@@ -305,9 +308,12 @@ export default function BattlesPage() {
             disabled={isBusy}
             aria-pressed={activeMode === "custom"}
           >
-            <span>Private</span>
-            <strong>Create lobby</strong>
-            <em>Invite-only</em>
+            <span className="battle-app-tab-index">02</span>
+
+            <span className="battle-app-tab-copy">
+              <strong>Private lobby</strong>
+              <em>Invite-only · unranked</em>
+            </span>
           </button>
 
           <button
@@ -321,9 +327,12 @@ export default function BattlesPage() {
             disabled={isBusy}
             aria-pressed={activeMode === "join"}
           >
-            <span>Code</span>
-            <strong>Join lobby</strong>
-            <em>ID or link</em>
+            <span className="battle-app-tab-index">03</span>
+
+            <span className="battle-app-tab-copy">
+              <strong>Join with code</strong>
+              <em>Paste ID or lobby link</em>
+            </span>
           </button>
         </nav>
 
@@ -453,6 +462,7 @@ export default function BattlesPage() {
 
                 <div className="battle-app-control-group">
                   <p className="panel-label">Sample</p>
+
                   <div className="battle-app-segment-row">
                     <button
                       type="button"
@@ -491,13 +501,17 @@ export default function BattlesPage() {
                           setSampleFile(event.target.files?.[0] ?? null)
                         }
                       />
-                      <span>{sampleFile ? sampleFile.name : "Choose audio file"}</span>
+
+                      <span>
+                        {sampleFile ? sampleFile.name : "Choose audio file"}
+                      </span>
                     </label>
                   )}
                 </div>
 
                 <div className="battle-app-control-group">
                   <p className="panel-label">Voting</p>
+
                   <div className="battle-app-segment-row">
                     <button
                       type="button"
@@ -560,6 +574,7 @@ export default function BattlesPage() {
 
                 <label className="battle-app-field battle-app-join-field">
                   <span>Lobby ID or invite link</span>
+
                   <input
                     type="text"
                     value={joinLobbyId}

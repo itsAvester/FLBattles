@@ -20,6 +20,12 @@ type LeaderRow = {
   wins?: number | null;
   losses?: number | null;
   selected_badge_key: string | null;
+  rank_change_7d?: number | null;
+  is_new_this_season?: boolean | null;
+  win_streak?: number | null;
+  activity_rank?: number | null;
+  season_badge_key?: string | null;
+  season_badge_label?: string | null;
 };
 
 type BoardKind = "season" | "allTime";
@@ -128,6 +134,35 @@ function formatWinRate(w: number | null) {
   return w === null ? "—" : `${Number(w).toFixed(1)}%`;
 }
 
+type SeasonSignal = {
+  label: string;
+  tone: "new" | "up" | "down" | "streak" | "badge";
+};
+
+function getSeasonSignals(player: LeaderRow): SeasonSignal[] {
+  const signals: SeasonSignal[] = [];
+  const rankChange = Number(player.rank_change_7d ?? 0);
+  const streak = Number(player.win_streak ?? 0);
+
+  if (player.is_new_this_season) {
+    signals.push({ label: "New", tone: "new" });
+  } else if (rankChange > 0) {
+    signals.push({ label: `↑ ${rankChange}`, tone: "up" });
+  } else if (rankChange < 0) {
+    signals.push({ label: `↓ ${Math.abs(rankChange)}`, tone: "down" });
+  }
+
+  if (streak >= 2) {
+    signals.push({ label: `${streak} win streak`, tone: "streak" });
+  }
+
+  if (player.season_badge_label) {
+    signals.push({ label: player.season_badge_label, tone: "badge" });
+  }
+
+  return signals.slice(0, 3);
+}
+
 export default function LeaderboardPage() {
   const [activeBoard, setActiveBoard] = useState<BoardKind>("season");
   const [seasonRows, setSeasonRows] = useState<LeaderRow[]>([]);
@@ -149,7 +184,9 @@ export default function LeaderboardPage() {
 
     let seasonQuery = supabase
       .from("current_season_leaderboard")
-      .select("id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key")
+      .select(
+        "id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key, rank_change_7d, is_new_this_season, win_streak, activity_rank, season_badge_key, season_badge_label"
+      )
       .order("rating", { ascending: false })
       .order("wins", { ascending: false })
       .order("total_battles", { ascending: false })
@@ -443,6 +480,8 @@ function PodiumCard({
 
         <h3>{getDisplayName(player)}</h3>
 
+        <SeasonSignalRow kind={kind} player={player} />
+
         <div className="leaderboard-mini-stat-grid leaderboard-mini-stat-grid-compact">
           <MiniStat label={kind === "season" ? "Points" : "Rating"} value={formatRating(player.rating)} />
           <MiniStat label="WR" value={formatWinRate(player.win_rate)} />
@@ -520,10 +559,13 @@ function LeaderboardTable({
                       <Link href={`/players/${player.id}`} className="leaderboard-player-cell">
                         <RankPill label={rankLabel} compact />
                         <BadgeIcon badgeKey={player.selected_badge_key} size={26} />
-                        <span>
-                          {name}
-                          {isCurrentUser && <em>You</em>}
-                        </span>
+                        <div className="leaderboard-player-main">
+                          <span className="leaderboard-player-name-line">
+                            {name}
+                            {isCurrentUser && <em>You</em>}
+                          </span>
+                          <SeasonSignalRow kind={kind} player={player} compact />
+                        </div>
                       </Link>
                     </td>
 
@@ -537,6 +579,41 @@ function LeaderboardTable({
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function SeasonSignalRow({
+  kind,
+  player,
+  compact = false,
+}: {
+  kind: BoardKind;
+  player: LeaderRow;
+  compact?: boolean;
+}) {
+  if (kind !== "season") return null;
+
+  const signals = getSeasonSignals(player);
+
+  if (signals.length === 0) return null;
+
+  return (
+    <div
+      className={
+        compact
+          ? "leaderboard-season-signals leaderboard-season-signals-compact"
+          : "leaderboard-season-signals"
+      }
+    >
+      {signals.map((signal) => (
+        <span
+          key={`${signal.tone}-${signal.label}`}
+          className={`leaderboard-season-signal leaderboard-season-signal-${signal.tone}`}
+        >
+          {signal.label}
+        </span>
+      ))}
     </div>
   );
 }

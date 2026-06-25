@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabaseClient";
@@ -15,6 +15,16 @@ type PlayerProfile = {
   spotify_url: string | null;
   soundcloud_url: string | null;
   youtube_url: string | null;
+
+  selected_badge?: string | null;
+  selected_badge_key?: string | null;
+  active_badge?: string | null;
+  active_badge_key?: string | null;
+  equipped_badge?: string | null;
+  equipped_badge_key?: string | null;
+  badge_key?: string | null;
+
+  [key: string]: unknown;
 };
 
 type ApprovedSample = {
@@ -22,6 +32,41 @@ type ApprovedSample = {
   file_path: string;
   created_at: string;
   audioUrl: string;
+};
+
+const BADGE_IMAGE_MAP: Record<string, { src: string; label: string }> = {
+  champion: {
+    src: "/badges/champion.png",
+    label: "Champion",
+  },
+  top_10: {
+    src: "/badges/top_10.png",
+    label: "Top 10",
+  },
+  perfect_record: {
+    src: "/badges/perfect_record.png",
+    label: "Perfect Record",
+  },
+  hot_streak: {
+    src: "/badges/hot_streak.png",
+    label: "Hot Streak",
+  },
+  veteran: {
+    src: "/badges/veteran.png",
+    label: "Veteran",
+  },
+  ranked_regular: {
+    src: "/badges/ranked_regular.png",
+    label: "Ranked Regular",
+  },
+  rising_producer: {
+    src: "/badges/rising_producer.png",
+    label: "Rising Producer",
+  },
+  first_win: {
+    src: "/badges/first_win.png",
+    label: "First Win",
+  },
 };
 
 function formatWinRate(value: number | null) {
@@ -56,7 +101,7 @@ function formatDate(dateString: string) {
 }
 
 function formatDuration(seconds: number | undefined) {
-  if (!seconds || !Number.isFinite(seconds)) return "--:--";
+  if (!seconds || !Number.isFinite(seconds)) return "0:00";
 
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
@@ -95,11 +140,35 @@ function getSafeExternalUrl(url: string | null) {
   return `https://${trimmed}`;
 }
 
+function resolveSelectedBadgeKey(profile: PlayerProfile | null) {
+  if (!profile) return null;
+
+  const candidateKeys = [
+    "selected_badge",
+    "selected_badge_key",
+    "active_badge",
+    "active_badge_key",
+    "equipped_badge",
+    "equipped_badge_key",
+    "badge_key",
+  ] as const;
+
+  for (const key of candidateKeys) {
+    const value = profile[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
 export default function PlayerPage() {
   const params = useParams<{ id: string }>();
   const playerId = params.id;
 
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
+  const seekLockRef = useRef<Record<string, boolean>>({});
 
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [approvedSamples, setApprovedSamples] = useState<ApprovedSample[]>([]);
@@ -129,9 +198,7 @@ export default function PlayerPage() {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select(
-          "id, display_name, total_battles, win_rate, rating, spotify_url, soundcloud_url, youtube_url"
-        )
+        .select("*")
         .eq("id", playerId as string)
         .single();
 
@@ -220,6 +287,20 @@ export default function PlayerPage() {
     setActiveSampleId(null);
   };
 
+  const handleSeekChange = (sampleId: string, event: ChangeEvent<HTMLInputElement>) => {
+    const audio = audioRefs.current[sampleId];
+    const nextTime = Number(event.target.value);
+
+    setAudioTimes((current) => ({
+      ...current,
+      [sampleId]: nextTime,
+    }));
+
+    if (audio && Number.isFinite(nextTime)) {
+      audio.currentTime = nextTime;
+    }
+  };
+
   if (loading) {
     return (
       <section className="page-inner fl-player-shell fl-player-state-shell">
@@ -276,6 +357,12 @@ export default function PlayerPage() {
   const battlesLabel = `${profile.total_battles ?? 0}`;
   const winRateLabel = formatWinRate(profile.win_rate);
   const initials = getInitials(name);
+
+  const selectedBadgeKey = resolveSelectedBadgeKey(profile);
+  const selectedBadgeMeta =
+    selectedBadgeKey && BADGE_IMAGE_MAP[selectedBadgeKey]
+      ? BADGE_IMAGE_MAP[selectedBadgeKey]
+      : null;
 
   const musicLinks = [
     {
@@ -340,7 +427,26 @@ export default function PlayerPage() {
       <div className="fl-player-page">
         <article className="card fl-player-hero-card">
           <div className="fl-player-hero-left">
-            <div className="fl-player-avatar">{initials}</div>
+            <div className="fl-player-badge-stack">
+              <div
+                className="fl-player-badge-display"
+                title={selectedBadgeMeta?.label ?? "Producer badge"}
+              >
+                {selectedBadgeMeta ? (
+                  <img
+                    src={selectedBadgeMeta.src}
+                    alt={selectedBadgeMeta.label}
+                    className="fl-player-badge-image"
+                  />
+                ) : (
+                  <span className="fl-player-badge-fallback">{initials}</span>
+                )}
+              </div>
+
+              <span className="fl-player-badge-caption">
+                {selectedBadgeMeta?.label ?? "Producer"}
+              </span>
+            </div>
 
             <div className="fl-player-identity">
               <div className="fl-player-kicker">
@@ -416,12 +522,10 @@ export default function PlayerPage() {
             ) : (
               <div className="fl-player-sample-list">
                 {approvedSamples.map((sample, index) => {
-                  const duration = audioDurations[sample.id];
+                  const duration = audioDurations[sample.id] ?? 0;
                   const currentTime = audioTimes[sample.id] ?? 0;
                   const progress =
-                    duration && duration > 0
-                      ? Math.min(100, (currentTime / duration) * 100)
-                      : 0;
+                    duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
                   const isActive = activeSampleId === sample.id;
                   const hasError = audioErrors[sample.id];
 
@@ -453,6 +557,39 @@ export default function PlayerPage() {
                           <span style={{ width: `${progress}%` }} />
                         </div>
 
+                        <div className="fl-player-seek-row">
+                          <span className="fl-player-timecode">
+                            {formatDuration(currentTime)}
+                          </span>
+
+                          <input
+                            type="range"
+                            min={0}
+                            max={duration || 0}
+                            step={0.01}
+                            value={Math.min(currentTime, duration || 0)}
+                            className="fl-player-seek-slider"
+                            disabled={hasError || duration <= 0}
+                            onMouseDown={() => {
+                              seekLockRef.current[sample.id] = true;
+                            }}
+                            onMouseUp={() => {
+                              seekLockRef.current[sample.id] = false;
+                            }}
+                            onTouchStart={() => {
+                              seekLockRef.current[sample.id] = true;
+                            }}
+                            onTouchEnd={() => {
+                              seekLockRef.current[sample.id] = false;
+                            }}
+                            onChange={(event) => handleSeekChange(sample.id, event)}
+                          />
+
+                          <span className="fl-player-timecode">
+                            {formatDuration(duration)}
+                          </span>
+                        </div>
+
                         <div className="fl-player-sample-meta">
                           Submitted {formatDate(sample.created_at)}
                         </div>
@@ -480,6 +617,8 @@ export default function PlayerPage() {
                           }));
                         }}
                         onTimeUpdate={(event) => {
+                          if (seekLockRef.current[sample.id]) return;
+
                           const audio = event.currentTarget;
 
                           setAudioTimes((current) => ({

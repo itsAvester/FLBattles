@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabaseClient";
@@ -24,9 +24,82 @@ type ApprovedSample = {
   audioUrl: string;
 };
 
+function formatWinRate(value: number | null) {
+  if (value == null) return "N/A";
+
+  const normalized = value <= 1 ? value * 100 : value;
+  return `${normalized.toFixed(1)}%`;
+}
+
+function formatRating(value: number | null) {
+  if (value == null) return "Unranked";
+  return `${Math.round(value)}`;
+}
+
+function formatGlobalRank(value: number | null) {
+  if (value == null) return "N/A";
+  return `#${value}`;
+}
+
+function formatDate(dateString: string) {
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatDuration(seconds: number | undefined) {
+  if (!seconds || !Number.isFinite(seconds)) return "--:--";
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function getInitials(name: string) {
+  const cleanName = name.trim();
+
+  if (!cleanName) return "FL";
+
+  const parts = cleanName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return parts.map((part) => part[0]).join("").toUpperCase();
+}
+
+function getSafeExternalUrl(url: string | null) {
+  if (!url) return null;
+
+  const trimmed = url.trim();
+
+  if (!trimmed) return null;
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
 export default function PlayerPage() {
   const params = useParams<{ id: string }>();
   const playerId = params.id;
+
+  const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
 
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [approvedSamples, setApprovedSamples] = useState<ApprovedSample[]>([]);
@@ -35,12 +108,24 @@ export default function PlayerPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const [activeSampleId, setActiveSampleId] = useState<string | null>(null);
+  const [audioDurations, setAudioDurations] = useState<Record<string, number>>({});
+  const [audioTimes, setAudioTimes] = useState<Record<string, number>>({});
+  const [audioErrors, setAudioErrors] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
     const load = async () => {
       if (!playerId) return;
 
       setLoading(true);
       setErrorMsg(null);
+      setProfile(null);
+      setApprovedSamples([]);
+      setGlobalRank(null);
+      setActiveSampleId(null);
+      setAudioDurations({});
+      setAudioTimes({});
+      setAudioErrors({});
 
       const { data, error } = await supabase
         .from("profiles")
@@ -105,82 +190,52 @@ export default function PlayerPage() {
     load();
   }, [playerId]);
 
-  const formatWinRate = (w: number | null) =>
-    w == null ? "N/A" : `${w.toFixed(1)}%`;
-
-  const formatRating = (r: number | null) =>
-    r == null ? "Unranked" : `${Math.round(r)}`;
-
-  const formatRankPosition = (pos: number | null) =>
-    pos == null ? "N/A" : `#${pos}`;
-
-  const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+  const pauseAllOtherSamples = (sampleId: string) => {
+    Object.entries(audioRefs.current).forEach(([id, audio]) => {
+      if (id !== sampleId && audio && !audio.paused) {
+        audio.pause();
+      }
     });
-
-  const pageFont =
-    "var(--font-manrope), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-
-  const statCardStyle: React.CSSProperties = {
-    border: "1px solid var(--line)",
-    background: "rgba(255, 255, 255, 0.025)",
-    padding: 18,
-    minHeight: 92,
   };
 
-  const statLabelStyle: React.CSSProperties = {
-    margin: 0,
-    color: "var(--muted)",
-    fontSize: "0.68rem",
-    fontWeight: 900,
-    textTransform: "uppercase",
-    letterSpacing: "0.14em",
-  };
+  const handleToggleSample = async (sampleId: string) => {
+    const audio = audioRefs.current[sampleId];
 
-  const statValueStyle: React.CSSProperties = {
-    display: "block",
-    marginTop: 10,
-    color: "var(--text)",
-    fontSize: "1.65rem",
-    lineHeight: 1,
-    fontWeight: 900,
-    letterSpacing: "-0.04em",
+    if (!audio || audioErrors[sampleId]) return;
+
+    if (audio.paused) {
+      pauseAllOtherSamples(sampleId);
+
+      try {
+        await audio.play();
+        setActiveSampleId(sampleId);
+      } catch (error) {
+        console.error("Audio play failed:", error);
+      }
+
+      return;
+    }
+
+    audio.pause();
+    setActiveSampleId(null);
   };
 
   if (loading) {
     return (
-      <section
-        className="page-inner"
-        style={{
-          paddingTop: 72,
-          paddingBottom: 96,
-          fontFamily: pageFont,
-        }}
-      >
+      <section className="page-inner fl-player-shell fl-player-state-shell">
         <div className="eyebrow">
           <span className="eyebrow-dot" />
           Producer profile
         </div>
 
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "clamp(3rem, 7vw, 6rem)",
-            lineHeight: 0.9,
-            letterSpacing: "-0.075em",
-            fontWeight: 800,
-            color: "var(--text)",
-          }}
-        >
-          Loading Player
-        </h1>
-
-        <div className="queue-status">
-          <span className="spinner" />
-          <span>Fetching producer profile.</span>
+        <div className="card fl-player-state-card">
+          <div className="fl-player-state-content">
+            <span className="spinner" />
+            <div>
+              <h1>Loading Player</h1>
+              <p>Fetching this producer&apos;s profile, stats, and approved samples.</p>
+            </div>
+          </div>
         </div>
       </section>
     );
@@ -188,435 +243,339 @@ export default function PlayerPage() {
 
   if (!profile) {
     return (
-      <section
-        className="page-inner"
-        style={{
-          paddingTop: 72,
-          paddingBottom: 96,
-          fontFamily: pageFont,
-        }}
-      >
+      <section className="page-inner fl-player-shell fl-player-state-shell">
         <div className="eyebrow">
           <span className="eyebrow-dot" />
           Producer profile
         </div>
 
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "clamp(3rem, 7vw, 6rem)",
-            lineHeight: 0.9,
-            letterSpacing: "-0.075em",
-            fontWeight: 800,
-            color: "var(--text)",
-          }}
-        >
-          Player Not Found
-        </h1>
+        <div className="card fl-player-state-card">
+          <div className="fl-player-state-content">
+            <div className="fl-player-avatar fl-player-avatar-error">?</div>
 
-        <p
-          style={{
-            marginTop: 18,
-            color: "var(--muted)",
-            lineHeight: 1.7,
-          }}
-        >
-          {errorMsg ?? "This player profile could not be loaded."}
-        </p>
+            <div>
+              <h1>Player Not Found</h1>
+              <p>{errorMsg ?? "This player profile could not be loaded."}</p>
 
-        <div style={{ marginTop: 24 }}>
-          <Link href="/leaderboard" className="btn-secondary">
-            Back to Leaderboard
-          </Link>
+              <Link href="/leaderboard" className="btn-secondary fl-player-state-button">
+                Back to Leaderboard
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
     );
   }
 
-  const tier = computeRankTier(profile.rating, globalRank);
   const name =
     profile.display_name || `Producer ${profile.id.slice(0, 6).toUpperCase()}`;
 
-  const hasAnyLink =
-    !!profile.spotify_url ||
-    !!profile.soundcloud_url ||
-    !!profile.youtube_url;
+  const tier = computeRankTier(profile.rating, globalRank);
+  const ratingLabel = formatRating(profile.rating);
+  const globalRankLabel = formatGlobalRank(globalRank);
+  const battlesLabel = `${profile.total_battles ?? 0}`;
+  const winRateLabel = formatWinRate(profile.win_rate);
+  const initials = getInitials(name);
+
+  const musicLinks = [
+    {
+      label: "YouTube",
+      href: getSafeExternalUrl(profile.youtube_url),
+    },
+    {
+      label: "SoundCloud",
+      href: getSafeExternalUrl(profile.soundcloud_url),
+    },
+    {
+      label: "Spotify",
+      href: getSafeExternalUrl(profile.spotify_url),
+    },
+  ].filter((link): link is { label: string; href: string } => Boolean(link.href));
+
+  const heroMetrics = [
+    {
+      label: "Tier",
+      value: tier,
+    },
+    {
+      label: "Global Rank",
+      value: globalRankLabel,
+    },
+    {
+      label: "Rating",
+      value: ratingLabel,
+    },
+    {
+      label: "Win Rate",
+      value: winRateLabel,
+    },
+  ];
+
+  const recordStats = [
+    {
+      label: "Tier",
+      value: tier,
+    },
+    {
+      label: "Rating",
+      value: ratingLabel,
+    },
+    {
+      label: "Global Rank",
+      value: globalRankLabel,
+    },
+    {
+      label: "Battles",
+      value: battlesLabel,
+    },
+    {
+      label: "Win Rate",
+      value: winRateLabel,
+      wide: true,
+    },
+  ];
 
   return (
-    <section
-      className="page-inner"
-      style={{
-        paddingTop: 72,
-        paddingBottom: 96,
-        fontFamily: pageFont,
-      }}
-    >
-      <div className="eyebrow">
-        <span className="eyebrow-dot" />
-        Producer profile · public view
-      </div>
+    <section className="page-inner fl-player-shell">
+      <div className="fl-player-page">
+        <article className="card fl-player-hero-card">
+          <div className="fl-player-hero-left">
+            <div className="fl-player-avatar">{initials}</div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.15fr) minmax(300px, 0.85fr)",
-          gap: 18,
-          alignItems: "stretch",
-          marginTop: 8,
-        }}
-      >
-        <div
-          className="card"
-          style={{
-            padding: 30,
-            overflow: "hidden",
-            minHeight: 360,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-          }}
-        >
-          <span className="card-number">01</span>
+            <div className="fl-player-identity">
+              <div className="fl-player-kicker">
+                <span className="eyebrow-dot" />
+                Public producer profile
+              </div>
 
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 14,
-                marginBottom: 20,
-              }}
-            >
-              <p className="panel-label" style={{ margin: 0 }}>
-                Public producer
+              <h1>{name}</h1>
+
+              <p>
+                Ranked battle record, approved community samples, and public music
+                links for this producer.
               </p>
-
-              <span className="sample-badge">{tier}</span>
             </div>
-
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "clamp(3.2rem, 7.2vw, 7rem)",
-                lineHeight: 0.86,
-                letterSpacing: "-0.075em",
-                fontWeight: 800,
-                color: "var(--text)",
-                wordBreak: "break-word",
-              }}
-            >
-              {name}
-            </h1>
-
-            <p
-              style={{
-                maxWidth: 620,
-                marginTop: 22,
-                color: "var(--muted)",
-                fontSize: "1rem",
-                lineHeight: 1.75,
-              }}
-            >
-              Public profile, battle record, music links, and approved community
-              samples from this producer.
-            </p>
           </div>
 
-          <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-              marginTop: 28,
-            }}
-          >
-            <Link href="/leaderboard" className="btn-secondary">
-              Back to Leaderboard
-            </Link>
+          <div className="fl-player-hero-right">
+            <div className="fl-player-hero-metrics">
+              {heroMetrics.map((metric) => (
+                <div key={metric.label} className="fl-player-metric-chip">
+                  <span>{metric.label}</span>
+                  <strong>{metric.value}</strong>
+                </div>
+              ))}
+            </div>
 
-            {profile.youtube_url && (
-              <a
-                href={profile.youtube_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-secondary"
-              >
-                YouTube
-              </a>
+            <div className="fl-player-actions">
+              <Link href="/leaderboard" className="btn-secondary">
+                Back
+              </Link>
+
+              {musicLinks.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary"
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          </div>
+        </article>
+
+        <div className="fl-player-dashboard">
+          <article className="card fl-player-panel fl-player-samples-panel">
+            <div className="fl-player-panel-header">
+              <div>
+                <p className="panel-label">Approved samples</p>
+                <h2>Sample Vault</h2>
+              </div>
+
+              <span className="sample-badge">
+                {approvedSamples.length} Approved
+              </span>
+            </div>
+
+            <p className="fl-player-panel-description">
+              Samples submitted by this producer that have been approved for future
+              battles.
+            </p>
+
+            {approvedSamples.length === 0 ? (
+              <div className="fl-player-empty-box">
+                <strong>No approved samples yet.</strong>
+                <span>
+                  When this producer has approved community samples, they will show
+                  here.
+                </span>
+              </div>
+            ) : (
+              <div className="fl-player-sample-list">
+                {approvedSamples.map((sample, index) => {
+                  const duration = audioDurations[sample.id];
+                  const currentTime = audioTimes[sample.id] ?? 0;
+                  const progress =
+                    duration && duration > 0
+                      ? Math.min(100, (currentTime / duration) * 100)
+                      : 0;
+                  const isActive = activeSampleId === sample.id;
+                  const hasError = audioErrors[sample.id];
+
+                  return (
+                    <div key={sample.id} className="fl-player-sample-row">
+                      <button
+                        type="button"
+                        className="fl-player-play-button"
+                        onClick={() => handleToggleSample(sample.id)}
+                        disabled={hasError}
+                        aria-label={
+                          isActive
+                            ? `Pause approved sample ${index + 1}`
+                            : `Play approved sample ${index + 1}`
+                        }
+                      >
+                        {hasError ? "!" : isActive ? "Ⅱ" : "▶"}
+                      </button>
+
+                      <div className="fl-player-sample-main">
+                        <div className="fl-player-sample-topline">
+                          <span>
+                            Approved Sample {String(index + 1).padStart(2, "0")}
+                          </span>
+                          <strong>{formatDuration(duration)}</strong>
+                        </div>
+
+                        <div className="fl-player-progress-track">
+                          <span style={{ width: `${progress}%` }} />
+                        </div>
+
+                        <div className="fl-player-sample-meta">
+                          Submitted {formatDate(sample.created_at)}
+                        </div>
+
+                        {hasError && (
+                          <div className="fl-player-sample-error">
+                            This audio file could not be loaded.
+                          </div>
+                        )}
+                      </div>
+
+                      <audio
+                        ref={(node) => {
+                          audioRefs.current[sample.id] = node;
+                        }}
+                        src={sample.audioUrl}
+                        preload="metadata"
+                        className="fl-player-audio-element"
+                        onLoadedMetadata={(event) => {
+                          const audio = event.currentTarget;
+
+                          setAudioDurations((current) => ({
+                            ...current,
+                            [sample.id]: audio.duration,
+                          }));
+                        }}
+                        onTimeUpdate={(event) => {
+                          const audio = event.currentTarget;
+
+                          setAudioTimes((current) => ({
+                            ...current,
+                            [sample.id]: audio.currentTime,
+                          }));
+                        }}
+                        onPlay={() => {
+                          pauseAllOtherSamples(sample.id);
+                          setActiveSampleId(sample.id);
+                        }}
+                        onPause={() => {
+                          setActiveSampleId((current) =>
+                            current === sample.id ? null : current
+                          );
+                        }}
+                        onEnded={() => {
+                          setActiveSampleId(null);
+                          setAudioTimes((current) => ({
+                            ...current,
+                            [sample.id]: 0,
+                          }));
+                        }}
+                        onError={() => {
+                          setAudioErrors((current) => ({
+                            ...current,
+                            [sample.id]: true,
+                          }));
+                        }}
+                      >
+                        Your browser does not support the audio element.
+                      </audio>
+                    </div>
+                  );
+                })}
+              </div>
             )}
+          </article>
 
-            {profile.soundcloud_url && (
-              <a
-                href={profile.soundcloud_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-secondary"
-              >
-                SoundCloud
-              </a>
-            )}
-
-            {profile.spotify_url && (
-              <a
-                href={profile.spotify_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-secondary"
-              >
-                Spotify
-              </a>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="card"
-          style={{
-            padding: 26,
-            overflow: "hidden",
-          }}
-        >
-          <span className="card-number">02</span>
-
-          <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 14,
-              marginBottom: 18,
-            }}
-          >
-            <p className="panel-label" style={{ margin: 0 }}>
-              Rank summary
-            </p>
-
-            <span className="sample-badge">Live</span>
-          </div>
-
-          <h2
-            style={{
-              position: "relative",
-              zIndex: 1,
-              margin: "0 0 18px",
-              fontSize: "clamp(2rem, 3.4vw, 3rem)",
-              fontWeight: 800,
-              lineHeight: 0.95,
-              letterSpacing: "-0.07em",
-              color: "var(--text)",
-            }}
-          >
-            Battle Stats
-          </h2>
-
-          <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-            }}
-          >
-            <div style={statCardStyle}>
-              <p style={statLabelStyle}>Tier</p>
-              <strong style={statValueStyle}>{tier}</strong>
-            </div>
-
-            <div style={statCardStyle}>
-              <p style={statLabelStyle}>Rating</p>
-              <strong style={statValueStyle}>
-                {formatRating(profile.rating)}
-              </strong>
-            </div>
-
-            <div style={statCardStyle}>
-              <p style={statLabelStyle}>Global Rank</p>
-              <strong style={statValueStyle}>
-                {formatRankPosition(globalRank)}
-              </strong>
-            </div>
-
-            <div style={statCardStyle}>
-              <p style={statLabelStyle}>Battles</p>
-              <strong style={statValueStyle}>
-                {profile.total_battles ?? 0}
-              </strong>
-            </div>
-
-            <div style={{ ...statCardStyle, gridColumn: "1 / -1" }}>
-              <p style={statLabelStyle}>Win Rate</p>
-              <strong style={statValueStyle}>
-                {formatWinRate(profile.win_rate)}
-              </strong>
-            </div>
-          </div>
-
-          {!hasAnyLink && (
-            <p
-              style={{
-                position: "relative",
-                zIndex: 1,
-                margin: "18px 0 0",
-                color: "var(--muted)",
-                lineHeight: 1.6,
-              }}
-            >
-              This producer has not added external music links yet.
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div
-        className="card"
-        style={{
-          marginTop: 18,
-          padding: 26,
-          overflow: "hidden",
-        }}
-      >
-        <span className="card-number">03</span>
-
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 14,
-            marginBottom: 18,
-          }}
-        >
-          <p className="panel-label" style={{ margin: 0 }}>
-            Approved samples
-          </p>
-
-          <span className="sample-badge">
-            {approvedSamples.length} Approved
-          </span>
-        </div>
-
-        <h2
-          style={{
-            position: "relative",
-            zIndex: 1,
-            margin: "0 0 12px",
-            fontSize: "clamp(2.2rem, 4vw, 4rem)",
-            fontWeight: 800,
-            lineHeight: 0.95,
-            letterSpacing: "-0.07em",
-            color: "var(--text)",
-          }}
-        >
-          Community Sample Vault
-        </h2>
-
-        <p
-          style={{
-            position: "relative",
-            zIndex: 1,
-            maxWidth: 720,
-            margin: "0 0 22px",
-            color: "var(--muted)",
-            lineHeight: 1.7,
-          }}
-        >
-          Samples submitted by this producer that have been approved for future
-          battles.
-        </p>
-
-        {approvedSamples.length === 0 && (
-          <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              border: "1px solid var(--line)",
-              background: "rgba(255, 255, 255, 0.025)",
-              padding: 18,
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                color: "var(--muted)",
-                lineHeight: 1.6,
-              }}
-            >
-              This producer does not have any approved samples yet.
-            </p>
-          </div>
-        )}
-
-        {approvedSamples.length > 0 && (
-          <div
-            style={{
-              position: "relative",
-              zIndex: 1,
-              display: "grid",
-              gap: 12,
-            }}
-          >
-            {approvedSamples.map((sample, index) => (
-              <div
-                key={sample.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(150px, 0.35fr) minmax(260px, 1fr)",
-                  gap: 16,
-                  alignItems: "center",
-                  border: "1px solid var(--line)",
-                  background: "rgba(255, 255, 255, 0.025)",
-                  padding: 16,
-                }}
-              >
+          <aside className="fl-player-sidebar">
+            <article className="card fl-player-panel fl-player-stats-panel">
+              <div className="fl-player-panel-header">
                 <div>
-                  <p
-                    style={{
-                      margin: 0,
-                      color: "var(--muted)",
-                      fontSize: "0.68rem",
-                      fontWeight: 900,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.14em",
-                    }}
-                  >
-                    Approved Sample {String(index + 1).padStart(2, "0")}
-                  </p>
-
-                  <strong
-                    style={{
-                      display: "block",
-                      marginTop: 8,
-                      color: "var(--text)",
-                      fontSize: "1rem",
-                    }}
-                  >
-                    Submitted {formatDate(sample.created_at)}
-                  </strong>
+                  <p className="panel-label">Battle record</p>
+                  <h2>Stats</h2>
                 </div>
 
-                <audio
-                  controls
-                  preload="metadata"
-                  src={sample.audioUrl}
-                  style={{
-                    width: "100%",
-                    minWidth: 0,
-                  }}
-                >
-                  Your browser does not support the audio element.
-                </audio>
+                <span className="sample-badge">Live</span>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="fl-player-stat-grid">
+                {recordStats.map((stat) => (
+                  <div
+                    key={stat.label}
+                    className={`fl-player-stat-card ${
+                      stat.wide ? "fl-player-stat-card-wide" : ""
+                    }`}
+                  >
+                    <span>{stat.label}</span>
+                    <strong>{stat.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="card fl-player-panel fl-player-links-panel">
+              <div className="fl-player-panel-header">
+                <div>
+                  <p className="panel-label">Music links</p>
+                  <h2>Connect</h2>
+                </div>
+              </div>
+
+              {musicLinks.length > 0 ? (
+                <div className="fl-player-link-grid">
+                  {musicLinks.map((link) => (
+                    <a
+                      key={link.label}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="fl-player-link-card"
+                    >
+                      <span>{link.label}</span>
+                      <strong>Open</strong>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="fl-player-empty-mini">
+                  This producer has not added external music links yet.
+                </div>
+              )}
+            </article>
+          </aside>
+        </div>
       </div>
     </section>
   );

@@ -455,11 +455,6 @@ export default function PlayerPage() {
               </div>
 
               <h1>{name}</h1>
-
-              <p>
-                Ranked battle record, approved community samples, and public music
-                links for this producer.
-              </p>
             </div>
           </div>
 

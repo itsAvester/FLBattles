@@ -289,7 +289,9 @@ export default function BattlesPage() {
             disabled={isBusy}
             aria-pressed={activeMode === "ranked"}
           >
-            <span className="battle-app-tab-index">01</span>
+            <span className="battle-app-tab-icon" aria-hidden="true">
+              <img src="/icons/battle-ranked.png" alt="" />
+            </span>
 
             <span className="battle-app-tab-copy">
               <strong>Ranked match</strong>
@@ -308,7 +310,9 @@ export default function BattlesPage() {
             disabled={isBusy}
             aria-pressed={activeMode === "custom"}
           >
-            <span className="battle-app-tab-index">02</span>
+            <span className="battle-app-tab-icon" aria-hidden="true">
+              <img src="/icons/battle-private.png" alt="" />
+            </span>
 
             <span className="battle-app-tab-copy">
               <strong>Private lobby</strong>
@@ -327,7 +331,9 @@ export default function BattlesPage() {
             disabled={isBusy}
             aria-pressed={activeMode === "join"}
           >
-            <span className="battle-app-tab-index">03</span>
+            <span className="battle-app-tab-icon" aria-hidden="true">
+              <img src="/icons/battle-join.png" alt="" />
+            </span>
 
             <span className="battle-app-tab-copy">
               <strong>Join with code</strong>

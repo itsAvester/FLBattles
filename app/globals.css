@@ -13391,3 +13391,18 @@ button.battle-custom-segment-active:hover {
     flex-basis: 40px !important;
   }
 }
+/* Fix remaining baked-in edge/padding on specific battle icons */
+.battle-app-tab-icon-private img,
+.battle-app-tab-icon-join img {
+  transform: scale(1.14);
+  transform-origin: center;
+}
+
+/* optional: tiny extra push if one still looks off */
+.battle-app-tab-icon-private img {
+  transform: scale(1.14);
+}
+
+.battle-app-tab-icon-join img {
+  transform: scale(1.16);
+}

@@ -310,7 +310,10 @@ export default function BattlesPage() {
             disabled={isBusy}
             aria-pressed={activeMode === "custom"}
           >
-            <span className="battle-app-tab-icon" aria-hidden="true">
+            <span
+              className="battle-app-tab-icon battle-app-tab-icon-private"
+              aria-hidden="true"
+            >
               <img src="/icons/battle-private.png" alt="" />
             </span>
 
@@ -331,7 +334,10 @@ export default function BattlesPage() {
             disabled={isBusy}
             aria-pressed={activeMode === "join"}
           >
-            <span className="battle-app-tab-icon" aria-hidden="true">
+            <span
+              className="battle-app-tab-icon battle-app-tab-icon-join"
+              aria-hidden="true"
+            >
               <img src="/icons/battle-join.png" alt="" />
             </span>
 

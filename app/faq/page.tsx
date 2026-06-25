@@ -19,27 +19,27 @@ const faqSections: FaqSection[] = [
   {
     number: "01",
     label: "Battle flow",
-    title: "How does FLBattles work?",
+    title: "How do online beat battles work?",
     summary:
-      "Join a lobby, get a sample, make a beat, upload it, vote, and see how your result affects your profile.",
+      "Join a beat battle lobby, get a shared sample, make a beat, upload it, vote, and see how your result affects your profile.",
     items: [
       {
-        question: "Join a battle lobby.",
+        question: "Join a beat battle lobby.",
         answer:
-          "Go to the Battles page and join or create a lobby. Every lobby has a unique battle ID.",
+          "Go to the Battles page and join a ranked beat battle or create a custom beat battle lobby. Every lobby has a unique battle ID.",
       },
       {
         question: "Get the sample.",
         answer:
-          "Each battle has one shared sample in the middle of the page. Download it and drop it into FL Studio or your DAW of choice.",
+          "Each beat battle has one shared sample in the middle of the page. Download it and drop it into FL Studio or your DAW of choice.",
       },
       {
         question: "Produce for 15 minutes.",
         answer:
-          "You have a 15-minute timer to build your beat. You can upload your track at any time during this window.",
+          "You have a 15-minute timer to build your beat from the shared sample. You can upload your track at any time during this window.",
       },
       {
-        question: "Upload your track.",
+        question: "Upload your beat.",
         answer:
           "When you are happy with your idea, export it as MP3, WAV, or another supported audio file and upload it in the lobby.",
       },
@@ -51,38 +51,38 @@ const faqSections: FaqSection[] = [
       {
         question: "Ranking and stats update.",
         answer:
-          "When a battle ends, your battles played, win rate, rating, rank tier, and leaderboard position can update.",
+          "When a ranked beat battle ends, your battles played, win rate, rating, rank tier, and leaderboard position can update.",
       },
     ],
   },
   {
     number: "02",
     label: "Profiles",
-    title: "What is my profile page for?",
+    title: "What is my producer profile for?",
     summary:
-      "Your profile is your public identity on FLBattles: name, links, battle stats, rating, and rank position.",
+      "Your profile is your public producer identity on FLBattles: display name, links, beat battle stats, rating, and rank position.",
     items: [
       {
         question: "Display name",
         answer:
-          "This is the name that shows on the leaderboard, battle results, and public player pages.",
+          "This is the name that shows on the leaderboard, beat battle results, and public player pages.",
       },
       {
         question: "Music links",
         answer:
-          "You can add Spotify, SoundCloud, and YouTube links so other players can check out your music.",
+          "You can add Spotify, SoundCloud, and YouTube links so other producers can check out your music outside of FLBattles.",
       },
       {
         question: "Stats",
         answer:
-          "Your profile shows battles played, win rate, current rating, rank tier, and global position.",
+          "Your profile shows battles played, win rate, current rating, rank tier, and global leaderboard position.",
       },
     ],
   },
   {
     number: "03",
     label: "Ranking",
-    title: "How does the ranking system work?",
+    title: "How do ranked beat battles work?",
     summary:
       "Players move through rank tiers based on rating. The top 10 players receive a special Champion title.",
     items: [
@@ -128,19 +128,19 @@ const faqSections: FaqSection[] = [
   {
     number: "04",
     label: "Leaderboard",
-    title: "How does the leaderboard work?",
+    title: "How does the beat battle leaderboard work?",
     summary:
       "The leaderboard shows the strongest producers by rating and lets players search public profiles.",
     items: [
       {
         question: "Top players",
         answer:
-          "The leaderboard shows the top players sorted by rating from highest to lowest.",
+          "The leaderboard shows the top producers sorted by rating from highest to lowest.",
       },
       {
         question: "Search",
         answer:
-          "You can search players by display name and open their public profile.",
+          "You can search players by display name and open their public producer profile.",
       },
       {
         question: "Champion rank",
@@ -152,7 +152,7 @@ const faqSections: FaqSection[] = [
   {
     number: "05",
     label: "Audio",
-    title: "Other questions",
+    title: "Other beat battle questions",
     summary:
       "Use any DAW, export a clean audio file, and expect the system to keep improving while FLBattles is in beta.",
     items: [
@@ -165,6 +165,11 @@ const faqSections: FaqSection[] = [
         question: "What audio formats are supported?",
         answer:
           "MP3 and WAV are the safest choices. If you run into upload issues, exporting as MP3 or WAV will usually fix it.",
+      },
+      {
+        question: "Can I host a private beat battle?",
+        answer:
+          "Yes. Custom lobbies let you host a private beat battle and invite producers with a direct lobby link.",
       },
       {
         question: "Will the rating system change?",
@@ -229,7 +234,7 @@ export default function FaqPage() {
               <div>
                 <div className="eyebrow faq-card-eyebrow">
                   <span className="eyebrow-dot" />
-                  Support desk · rules and ranking
+                  Support desk · beat battle rules and ranking
                 </div>
 
                 <h1>{activeSection.title}</h1>
@@ -257,11 +262,11 @@ export default function FaqPage() {
             Ready to play?
           </div>
 
-          <h2>Start your next 15-minute battle.</h2>
+          <h2>Start your next online beat battle.</h2>
 
           <p>
             Queue into a ranked lobby, flip the sample, upload your beat, and
-            see how it stacks up.
+            see how it stacks up against other producers.
           </p>
 
           <div className="faq-cta-actions">

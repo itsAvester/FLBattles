@@ -13406,3 +13406,15 @@ button.battle-custom-segment-active:hover {
 .battle-app-tab-icon-join img {
   transform: scale(1.16);
 }
+/* Final crop fix for Ranked + Private battle icons only */
+.battle-app-tabs .battle-app-tab:nth-child(1) .battle-app-tab-icon img,
+.battle-app-tab-icon-private img {
+  transform: scale(1.24) !important;
+  transform-origin: center !important;
+}
+
+/* Keep Join with code exactly as-is since it already looks correct */
+.battle-app-tab-icon-join img {
+  transform: scale(1.16) !important;
+  transform-origin: center !important;
+}

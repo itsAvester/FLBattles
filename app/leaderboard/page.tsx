@@ -26,9 +26,13 @@ type LeaderRow = {
   activity_rank?: number | null;
   season_badge_key?: string | null;
   season_badge_label?: string | null;
+  leaderboard_rank?: number;
 };
 
 type BoardKind = "season" | "allTime";
+
+const PAGE_SIZE = 1000;
+const MAX_ROWS_TO_LOAD = 10000;
 
 function getRankFromRating(rating: number | null | undefined): string {
   const r = rating ?? 0;
@@ -134,6 +138,79 @@ function formatWinRate(winRate: number | null) {
   return winRate === null ? "—" : `${Number(winRate).toFixed(1)}%`;
 }
 
+function addLeaderboardRanks(rows: LeaderRow[]): LeaderRow[] {
+  return rows.map((row, index) => ({
+    ...row,
+    leaderboard_rank: index + 1,
+  }));
+}
+
+function matchesSearch(player: LeaderRow, term: string) {
+  const cleanTerm = term.trim().toLowerCase();
+
+  if (!cleanTerm) return true;
+
+  return getDisplayName(player).toLowerCase().includes(cleanTerm);
+}
+
+async function fetchCurrentSeasonRows(): Promise<LeaderRow[]> {
+  const allRows: LeaderRow[] = [];
+
+  for (let from = 0; from < MAX_ROWS_TO_LOAD; from += PAGE_SIZE) {
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from("current_season_leaderboard")
+      .select(
+        "id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key, rank_change_7d, is_new_this_season, win_streak, activity_rank, season_badge_key, season_badge_label"
+      )
+      .order("rating", { ascending: false })
+      .order("wins", { ascending: false })
+      .order("total_battles", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw new Error(error.message || "Unable to load current season leaderboard.");
+    }
+
+    const pageRows = (data ?? []) as LeaderRow[];
+    allRows.push(...pageRows);
+
+    if (pageRows.length < PAGE_SIZE) break;
+  }
+
+  return addLeaderboardRanks(allRows);
+}
+
+async function fetchAllTimeRows(): Promise<LeaderRow[]> {
+  const allRows: LeaderRow[] = [];
+
+  for (let from = 0; from < MAX_ROWS_TO_LOAD; from += PAGE_SIZE) {
+    const to = from + PAGE_SIZE - 1;
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select(
+        "id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key"
+      )
+      .gt("total_battles", 0)
+      .order("rating", { ascending: false })
+      .order("total_battles", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw new Error(error.message || "Unable to load all-time leaderboard.");
+    }
+
+    const pageRows = (data ?? []) as LeaderRow[];
+    allRows.push(...pageRows);
+
+    if (pageRows.length < PAGE_SIZE) break;
+  }
+
+  return addLeaderboardRanks(allRows);
+}
+
 type SeasonSignal = {
   label: string;
   tone: "new" | "up" | "down" | "streak" | "badge";
@@ -175,56 +252,27 @@ export default function LeaderboardPage() {
 
   const season = useMemo(() => getSeasonInfo(), []);
 
-  const loadLeaderboards = async (term?: string) => {
-    const cleanTerm = term?.trim() ?? "";
-
+  const loadLeaderboards = async () => {
     setLoading(true);
     setErrorMsg(null);
 
-    let seasonQuery = supabase
-      .from("current_season_leaderboard")
-      .select(
-        "id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key, rank_change_7d, is_new_this_season, win_streak, activity_rank, season_badge_key, season_badge_label"
-      )
-      .order("rating", { ascending: false })
-      .order("wins", { ascending: false })
-      .order("total_battles", { ascending: false })
-      .limit(100);
+    try {
+      const [seasonData, allTimeData] = await Promise.all([
+        fetchCurrentSeasonRows(),
+        fetchAllTimeRows(),
+      ]);
 
-    let allTimeQuery = supabase
-      .from("profiles")
-      .select(
-        "id, display_name, rating, total_battles, wins, losses, win_rate, selected_badge_key"
-      )
-      .gt("total_battles", 0)
-      .order("rating", { ascending: false })
-      .order("total_battles", { ascending: false })
-      .limit(100);
-
-    if (cleanTerm) {
-      seasonQuery = seasonQuery.ilike("display_name", `%${cleanTerm}%`);
-      allTimeQuery = allTimeQuery.ilike("display_name", `%${cleanTerm}%`);
-    }
-
-    const [seasonResult, allTimeResult] = await Promise.all([
-      seasonQuery,
-      allTimeQuery,
-    ]);
-
-    if (seasonResult.error || allTimeResult.error) {
+      setSeasonRows(seasonData);
+      setAllTimeRows(allTimeData);
+    } catch (error) {
       setErrorMsg(
-        seasonResult.error?.message ||
-          allTimeResult.error?.message ||
-          "Unable to load leaderboard."
+        error instanceof Error ? error.message : "Unable to load leaderboard."
       );
       setSeasonRows([]);
       setAllTimeRows([]);
-    } else {
-      setSeasonRows((seasonResult.data ?? []) as LeaderRow[]);
-      setAllTimeRows((allTimeResult.data ?? []) as LeaderRow[]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -238,30 +286,32 @@ export default function LeaderboardPage() {
     loadUser();
   }, []);
 
-  const handleSearch = async (event: FormEvent) => {
+  const handleSearch = (event: FormEvent) => {
     event.preventDefault();
 
     const term = searchTerm.trim();
     setSearching(!!term);
-    await loadLeaderboards(term);
   };
 
-  const clearSearch = async () => {
+  const clearSearch = () => {
     setSearchTerm("");
     setSearching(false);
-    await loadLeaderboards();
   };
 
   const switchBoard = (board: BoardKind) => {
     setActiveBoard(board);
   };
 
-  const activeRows = activeBoard === "season" ? seasonRows : allTimeRows;
-  const activeCurrentUserIndex = !searching
-    ? activeRows.findIndex((player) => player.id === currentUserId)
-    : -1;
-  const activeCurrentUserRank =
-    activeCurrentUserIndex >= 0 ? activeCurrentUserIndex + 1 : null;
+  const activeFullRows = activeBoard === "season" ? seasonRows : allTimeRows;
+
+  const activeRows = useMemo(() => {
+    if (!searching) return activeFullRows;
+
+    return activeFullRows.filter((player) => matchesSearch(player, searchTerm));
+  }, [activeFullRows, searching, searchTerm]);
+
+  const currentUserRow = activeFullRows.find((player) => player.id === currentUserId);
+  const activeCurrentUserRank = currentUserRow?.leaderboard_rank ?? null;
 
   const activeBoardCopy =
     activeBoard === "season"
@@ -377,7 +427,7 @@ export default function LeaderboardPage() {
                 />
 
                 <button type="submit" className="btn-secondary">
-                  {loading && searching ? "Searching..." : "Search"}
+                  Search
                 </button>
 
                 {searching && (
@@ -461,11 +511,11 @@ function LeaderboardBoard({
     <section className={`leaderboard-app-board leaderboard-app-board-${kind}`}>
       {!loading && podiumRows.length > 0 && (
         <div className="leaderboard-app-podium-grid">
-          {podiumRows.map((player, index) => (
+          {podiumRows.map((player) => (
             <PodiumCard
               key={`${kind}-${player.id}`}
               player={player}
-              rank={index + 1}
+              rank={player.leaderboard_rank ?? 1}
               kind={kind}
             />
           ))}
@@ -478,7 +528,6 @@ function LeaderboardBoard({
         loading={loading}
         currentUserId={currentUserId}
         emptyMessage={emptyMessage}
-        startRank={!searching ? 4 : 1}
         primaryMetricLabel={primaryMetricLabel}
       />
     </section>
@@ -526,7 +575,10 @@ function PodiumCard({
         <SeasonSignalRow kind={kind} player={player} />
 
         <div className="leaderboard-app-mini-stat-grid">
-          <MiniStat label={kind === "season" ? "Points" : "Rating"} value={formatRating(player.rating)} />
+          <MiniStat
+            label={kind === "season" ? "Points" : "Rating"}
+            value={formatRating(player.rating)}
+          />
           <MiniStat label="WR" value={formatWinRate(player.win_rate)} />
           <MiniStat label="Battles" value={player.total_battles ?? 0} />
         </div>
@@ -541,7 +593,6 @@ function LeaderboardTable({
   loading,
   currentUserId,
   emptyMessage,
-  startRank,
   primaryMetricLabel,
 }: {
   kind: BoardKind;
@@ -549,7 +600,6 @@ function LeaderboardTable({
   loading: boolean;
   currentUserId: string | null;
   emptyMessage: string;
-  startRank: number;
   primaryMetricLabel: string;
 }) {
   return (
@@ -578,8 +628,8 @@ function LeaderboardTable({
             </thead>
 
             <tbody>
-              {rows.map((player, index) => {
-                const rank = startRank + index;
+              {rows.map((player) => {
+                const rank = player.leaderboard_rank ?? 0;
                 const name = getDisplayName(player);
                 const isCurrentUser = player.id === currentUserId;
                 const rankLabel =
@@ -596,7 +646,7 @@ function LeaderboardTable({
                     key={`${kind}-table-${player.id}`}
                     className={isCurrentUser ? "leaderboard-current-user-row" : undefined}
                   >
-                    <td style={tdLeftMutedStyle}>{rank}</td>
+                    <td style={tdLeftMutedStyle}>{rank ? rank : "—"}</td>
 
                     <td style={tdNameStyle}>
                       <Link href={`/players/${player.id}`} className="leaderboard-player-cell leaderboard-app-player-cell">

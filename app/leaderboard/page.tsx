@@ -240,6 +240,46 @@ function getSeasonSignals(player: LeaderRow): SeasonSignal[] {
   return signals.slice(0, 3);
 }
 
+async function copyTextToClipboard(text: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document === "undefined") return;
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
+}
+
+function getLeaderboardSharePayload(player: LeaderRow, kind: BoardKind) {
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "https://flbattles.com";
+  const url = new URL("/leaderboard", origin);
+  url.searchParams.set("board", kind);
+  url.searchParams.set("producer", player.id);
+
+  const boardLabel = kind === "season" ? "current season" : "all-time";
+  const name = getDisplayName(player);
+  const rank = player.leaderboard_rank ? `#${player.leaderboard_rank}` : "on the board";
+  const metricLabel = kind === "season" ? "points" : "rating";
+  const metricValue = formatRating(player.rating);
+  const battles = player.total_battles ?? 0;
+  const winRate = formatWinRate(player.win_rate);
+
+  const title = `${name} is ${rank} on FLBattles`;
+  const text = `${name} is ${rank} on the FLBattles ${boardLabel} leaderboard with ${metricValue} ${metricLabel}, ${winRate} win rate, and ${battles} battle${battles === 1 ? "" : "s"} played. Try to catch them in an online beat battle.`;
+
+  return { title, text, url: url.toString() };
+}
+
 export default function LeaderboardPage() {
   const [activeBoard, setActiveBoard] = useState<BoardKind>("season");
   const [seasonRows, setSeasonRows] = useState<LeaderRow[]>([]);
@@ -249,6 +289,7 @@ export default function LeaderboardPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [searching, setSearching] = useState(false);
+  const [copiedShareKey, setCopiedShareKey] = useState<string | null>(null);
 
   const season = useMemo(() => getSeasonInfo(), []);
 
@@ -300,6 +341,35 @@ export default function LeaderboardPage() {
 
   const switchBoard = (board: BoardKind) => {
     setActiveBoard(board);
+  };
+
+  const handleShareLeaderboardPosition = async (player: LeaderRow, kind: BoardKind) => {
+    const sharePayload = getLeaderboardSharePayload(player, kind);
+    const shareKey = `${kind}-${player.id}`;
+
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share(sharePayload);
+      } else {
+        await copyTextToClipboard(`${sharePayload.text} ${sharePayload.url}`);
+      }
+
+      setCopiedShareKey(shareKey);
+      window.setTimeout(() => {
+        setCopiedShareKey((current) => (current === shareKey ? null : current));
+      }, 1800);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+
+      console.error("Unable to share leaderboard position:", error);
+
+      try {
+        await copyTextToClipboard(`${sharePayload.text} ${sharePayload.url}`);
+        setCopiedShareKey(shareKey);
+      } catch (clipboardError) {
+        console.error("Unable to copy leaderboard share text:", clipboardError);
+      }
+    }
   };
 
   const activeFullRows = activeBoard === "season" ? seasonRows : allTimeRows;
@@ -470,6 +540,8 @@ export default function LeaderboardPage() {
           loading={loading}
           searching={searching}
           currentUserId={currentUserId}
+          copiedShareKey={copiedShareKey}
+          onSharePlayer={handleShareLeaderboardPosition}
           primaryMetricLabel={activeBoardCopy.primaryMetricLabel}
           emptyMessage={
             searching
@@ -492,6 +564,8 @@ function LeaderboardBoard({
   loading,
   searching,
   currentUserId,
+  copiedShareKey,
+  onSharePlayer,
   primaryMetricLabel,
   emptyMessage,
 }: {
@@ -500,6 +574,8 @@ function LeaderboardBoard({
   loading: boolean;
   searching: boolean;
   currentUserId: string | null;
+  copiedShareKey: string | null;
+  onSharePlayer: (player: LeaderRow, kind: BoardKind) => void;
   primaryMetricLabel: string;
   emptyMessage: string;
 }) {
@@ -517,6 +593,9 @@ function LeaderboardBoard({
               player={player}
               rank={player.leaderboard_rank ?? 1}
               kind={kind}
+              currentUserId={currentUserId}
+              copiedShareKey={copiedShareKey}
+              onSharePlayer={onSharePlayer}
             />
           ))}
         </div>
@@ -527,6 +606,8 @@ function LeaderboardBoard({
         rows={tableRows}
         loading={loading}
         currentUserId={currentUserId}
+        copiedShareKey={copiedShareKey}
+        onSharePlayer={onSharePlayer}
         emptyMessage={emptyMessage}
         primaryMetricLabel={primaryMetricLabel}
       />
@@ -538,10 +619,16 @@ function PodiumCard({
   player,
   rank,
   kind,
+  currentUserId,
+  copiedShareKey,
+  onSharePlayer,
 }: {
   player: LeaderRow;
   rank: number;
   kind: BoardKind;
+  currentUserId: string | null;
+  copiedShareKey: string | null;
+  onSharePlayer: (player: LeaderRow, kind: BoardKind) => void;
 }) {
   const isChampion = rank === 1;
   const statusLabel =
@@ -553,37 +640,52 @@ function PodiumCard({
         ? "Top 10"
         : getRankFromRating(player.rating);
 
+  const isCurrentUser = player.id === currentUserId;
+  const shareKey = `${kind}-${player.id}`;
+  const shareWasCopied = copiedShareKey === shareKey;
+
   return (
-    <Link
-      href={`/players/${player.id}`}
+    <article
       className={`leaderboard-app-podium-card ${
         isChampion ? "leaderboard-app-podium-card-champion" : ""
-      }`}
+      } ${isCurrentUser ? "leaderboard-app-podium-card-current" : ""}`}
     >
-      <div className="leaderboard-app-podium-bg-number">{rank}</div>
+      <Link href={`/players/${player.id}`} className="leaderboard-app-podium-link">
+        <div className="leaderboard-app-podium-bg-number">{rank}</div>
 
-      <div className="leaderboard-app-podium-topline">
-        <span className="leaderboard-app-rank-bubble">#{rank}</span>
-        <BadgeIcon badgeKey={player.selected_badge_key} size={30} />
-      </div>
-
-      <div className="leaderboard-app-podium-body">
-        <RankPill label={statusLabel} />
-
-        <h3>{getDisplayName(player)}</h3>
-
-        <SeasonSignalRow kind={kind} player={player} />
-
-        <div className="leaderboard-app-mini-stat-grid">
-          <MiniStat
-            label={kind === "season" ? "Points" : "Rating"}
-            value={formatRating(player.rating)}
-          />
-          <MiniStat label="WR" value={formatWinRate(player.win_rate)} />
-          <MiniStat label="Battles" value={player.total_battles ?? 0} />
+        <div className="leaderboard-app-podium-topline">
+          <span className="leaderboard-app-rank-bubble">#{rank}</span>
+          <BadgeIcon badgeKey={player.selected_badge_key} size={30} />
         </div>
-      </div>
-    </Link>
+
+        <div className="leaderboard-app-podium-body">
+          <RankPill label={statusLabel} />
+
+          <h3>{getDisplayName(player)}</h3>
+
+          <SeasonSignalRow kind={kind} player={player} />
+
+          <div className="leaderboard-app-mini-stat-grid">
+            <MiniStat
+              label={kind === "season" ? "Points" : "Rating"}
+              value={formatRating(player.rating)}
+            />
+            <MiniStat label="WR" value={formatWinRate(player.win_rate)} />
+            <MiniStat label="Battles" value={player.total_battles ?? 0} />
+          </div>
+        </div>
+      </Link>
+
+      {isCurrentUser && (
+        <button
+          type="button"
+          className="leaderboard-share-pill leaderboard-share-pill-podium"
+          onClick={() => onSharePlayer(player, kind)}
+        >
+          {shareWasCopied ? "Copied" : "Share"}
+        </button>
+      )}
+    </article>
   );
 }
 
@@ -592,6 +694,8 @@ function LeaderboardTable({
   rows,
   loading,
   currentUserId,
+  copiedShareKey,
+  onSharePlayer,
   emptyMessage,
   primaryMetricLabel,
 }: {
@@ -599,6 +703,8 @@ function LeaderboardTable({
   rows: LeaderRow[];
   loading: boolean;
   currentUserId: string | null;
+  copiedShareKey: string | null;
+  onSharePlayer: (player: LeaderRow, kind: BoardKind) => void;
   emptyMessage: string;
   primaryMetricLabel: string;
 }) {
@@ -624,6 +730,7 @@ function LeaderboardTable({
                 <th style={thRightStyle}>{primaryMetricLabel}</th>
                 <th style={thRightStyle}>Win Rate</th>
                 <th style={thRightStyle}>Battles</th>
+                <th style={thRightStyle}>Share</th>
               </tr>
             </thead>
 
@@ -632,6 +739,8 @@ function LeaderboardTable({
                 const rank = player.leaderboard_rank ?? 0;
                 const name = getDisplayName(player);
                 const isCurrentUser = player.id === currentUserId;
+                const shareKey = `${kind}-${player.id}`;
+                const shareWasCopied = copiedShareKey === shareKey;
                 const rankLabel =
                   rank === 1
                     ? kind === "season"
@@ -666,6 +775,19 @@ function LeaderboardTable({
                     <td style={tdRightStyle}>{formatRating(player.rating)}</td>
                     <td style={tdRightStyle}>{formatWinRate(player.win_rate)}</td>
                     <td style={tdRightStyle}>{player.total_battles ?? 0}</td>
+                    <td style={tdRightStyle}>
+                      {isCurrentUser ? (
+                        <button
+                          type="button"
+                          className="leaderboard-share-pill"
+                          onClick={() => onSharePlayer(player, kind)}
+                        >
+                          {shareWasCopied ? "Copied" : "Share"}
+                        </button>
+                      ) : (
+                        <span className="leaderboard-share-empty">—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

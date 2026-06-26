@@ -23,18 +23,34 @@ type BadgeUnlockRow = {
   isSelf: boolean;
 };
 
+type BadgeUnlockHistoryRow = {
+  id: string;
+  user_id: string;
+  badge_key: string;
+  unlocked_at: string;
+  battle_id?: string | null;
+};
+
 type BattleResultsProps = {
   battleId: string;
 };
 
 type LobbyResult = {
   winner_user_id: string | null;
+  winner_vote_count: number | null;
   status: string | null;
   mode: string | null;
+  sample_name: string | null;
+  sample_url: string | null;
   created_at: string | null;
   finished_at: string | null;
   voting_style: "everyone" | "host" | null;
   host_user_id: string | null;
+};
+
+type VoteCountRow = {
+  submission_user_id: string;
+  votes: number | null;
 };
 
 function getOrdinal(place: number): string {
@@ -50,6 +66,16 @@ function getPodiumClass(place: number): string {
   if (place === 3) return "podium-card podium-card-third";
   return "podium-card";
 }
+
+function getBadgeUnlockKey(row: Pick<BadgeUnlockHistoryRow, "user_id" | "badge_key">) {
+  return `${row.user_id}:${row.badge_key}`;
+}
+
+function getBadgeUnlockTime(value: string | null | undefined): number {
+  const parsed = new Date(value ?? "").getTime();
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+}
+
 
 export default function BattleResults({ battleId }: BattleResultsProps) {
   const router = useRouter();
@@ -72,7 +98,7 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
 
       const { data: lobbyData, error: lobbyErr } = await supabase
         .from("battle_lobbies")
-        .select("winner_user_id, status, mode, created_at, finished_at, voting_style, host_user_id")
+        .select("winner_user_id, winner_vote_count, status, mode, sample_name, sample_url, created_at, finished_at, voting_style, host_user_id")
         .eq("id", battleId)
         .single();
 
@@ -99,13 +125,13 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
         return;
       }
 
-      const { data: votes, error: voteErr } = await supabase
-        .from("battle_votes")
-        .select("submission_user_id")
+      const { data: voteCountRows, error: voteErr } = await supabase
+        .from("public_finished_battle_vote_counts")
+        .select("submission_user_id, votes")
         .eq("battle_id", battleId);
 
-      if (voteErr || !votes) {
-        console.error("Error loading votes:", voteErr);
+      if (voteErr) {
+        console.error("Error loading vote counts:", voteErr);
         setError("Could not load battle votes.");
         setLoading(false);
         return;
@@ -155,8 +181,63 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
         );
       }
 
-      const formattedUnlocks: BadgeUnlockRow[] = (unlockRows ?? []).map(
-        (unlock: any) => ({
+      const currentBattleUnlockRows = (unlockRows ?? []) as BadgeUnlockHistoryRow[];
+      let firstUnlockIdByUserBadge = new Map<string, string>();
+
+      if (currentBattleUnlockRows.length > 0) {
+        const badgeUnlockUserIds = Array.from(
+          new Set(currentBattleUnlockRows.map((unlock) => unlock.user_id).filter(Boolean))
+        );
+        const badgeUnlockKeys = Array.from(
+          new Set(currentBattleUnlockRows.map((unlock) => unlock.badge_key).filter(Boolean))
+        );
+
+        const { data: allUnlockRows, error: allUnlocksError } = await supabase
+          .from("battle_badge_unlocks")
+          .select("id, user_id, badge_key, unlocked_at, battle_id")
+          .in("user_id", badgeUnlockUserIds)
+          .in("badge_key", badgeUnlockKeys)
+          .order("unlocked_at", { ascending: true });
+
+        if (allUnlocksError) {
+          console.error("Error loading badge unlock history:", allUnlocksError);
+        }
+
+        const unlockHistory = ((allUnlockRows ?? currentBattleUnlockRows) as BadgeUnlockHistoryRow[])
+          .filter((unlock) => unlock.id && unlock.user_id && unlock.badge_key)
+          .sort((a, b) => {
+            const timeDiff = getBadgeUnlockTime(a.unlocked_at) - getBadgeUnlockTime(b.unlocked_at);
+            if (timeDiff !== 0) return timeDiff;
+            return String(a.id).localeCompare(String(b.id));
+          });
+
+        for (const unlock of unlockHistory) {
+          const unlockKey = getBadgeUnlockKey(unlock);
+
+          if (!firstUnlockIdByUserBadge.has(unlockKey)) {
+            firstUnlockIdByUserBadge.set(unlockKey, unlock.id);
+          }
+        }
+      }
+
+      const visibleUnlockRows = currentBattleUnlockRows.filter((unlock) => {
+        const firstUnlockId = firstUnlockIdByUserBadge.get(getBadgeUnlockKey(unlock));
+
+        // If the history query fails, fall back to showing current-battle rows.
+        // If it succeeds, only show the first-ever unlock for each player/badge pair.
+        return !firstUnlockId || firstUnlockId === unlock.id;
+      });
+
+      const visibleUnlockKeys = new Set<string>();
+      const formattedUnlocks: BadgeUnlockRow[] = [];
+
+      for (const unlock of visibleUnlockRows) {
+        const unlockKey = getBadgeUnlockKey(unlock);
+
+        if (visibleUnlockKeys.has(unlockKey)) continue;
+        visibleUnlockKeys.add(unlockKey);
+
+        formattedUnlocks.push({
           id: unlock.id,
           user_id: unlock.user_id,
           badge_key: unlock.badge_key,
@@ -164,15 +245,14 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
           displayName:
             profileById.get(unlock.user_id)?.displayName ?? "Unnamed Producer",
           isSelf: currentUserId === unlock.user_id,
-        })
-      );
+        });
+      }
 
       setBadgeUnlocks(formattedUnlocks);
 
       const voteCounts = new Map<string, number>();
-      for (const vote of votes as any[]) {
-        const key = vote.submission_user_id;
-        voteCounts.set(key, (voteCounts.get(key) ?? 0) + 1);
+      for (const voteRow of (voteCountRows ?? []) as VoteCountRow[]) {
+        voteCounts.set(voteRow.submission_user_id, Number(voteRow.votes ?? 0));
       }
 
       const resultRows: ResultRow[] = (submissions as any[]).map(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type CSSProperties, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 import { censorChatMessage } from "../../lib/chatModeration";
@@ -197,16 +197,105 @@ function getRankTheme(rank: string) {
 }
 
 
-function getBadgeDisplay(badgeKey: string | null | undefined) {
+type BadgeDisplay = {
+  label: string;
+  short: string;
+  imageSrc: string | null;
+  tone:
+    | "champion"
+    | "goat"
+    | "perfect"
+    | "fire"
+    | "veteran"
+    | "regular"
+    | "rising"
+    | "default";
+};
+
+function getBadgeDisplay(badgeKey: string | null | undefined): BadgeDisplay | null {
   if (!badgeKey) return null;
 
-  const knownBadges: Record<string, { label: string; short: string }> = {
-    season_champion: { label: "Champion Pace", short: "CH" },
-    season_top_10: { label: "Top 10 Pace", short: "T10" },
-    season_most_active: { label: "Most Active", short: "ACT" },
-    first_win: { label: "First Win", short: "W1" },
-    win_streak: { label: "Win Streak", short: "WS" },
-    battle_winner: { label: "Battle Winner", short: "BW" },
+  const knownBadges: Record<string, BadgeDisplay> = {
+    champion: {
+      label: "Champion",
+      short: "CH",
+      imageSrc: "/badges/champion.png",
+      tone: "champion",
+    },
+    top_10: {
+      label: "Top 10",
+      short: "T10",
+      imageSrc: "/badges/top_10.png",
+      tone: "goat",
+    },
+    perfect_record: {
+      label: "Perfect Record",
+      short: "PR",
+      imageSrc: "/badges/perfect_record.png",
+      tone: "perfect",
+    },
+    hot_streak: {
+      label: "Hot Streak",
+      short: "HS",
+      imageSrc: "/badges/hot_streak.png",
+      tone: "fire",
+    },
+    veteran: {
+      label: "Veteran",
+      short: "V",
+      imageSrc: "/badges/veteran.png",
+      tone: "veteran",
+    },
+    ranked_regular: {
+      label: "Ranked Regular",
+      short: "RR",
+      imageSrc: "/badges/ranked_regular.png",
+      tone: "regular",
+    },
+    rising_producer: {
+      label: "Rising Producer",
+      short: "RP",
+      imageSrc: "/badges/rising_producer.png",
+      tone: "rising",
+    },
+    first_win: {
+      label: "First Win",
+      short: "W1",
+      imageSrc: "/badges/first_win.png",
+      tone: "champion",
+    },
+
+    // Legacy keys from older lobby/profile badge data.
+    season_champion: {
+      label: "Champion Pace",
+      short: "CH",
+      imageSrc: "/badges/champion.png",
+      tone: "champion",
+    },
+    season_top_10: {
+      label: "Top 10 Pace",
+      short: "T10",
+      imageSrc: "/badges/top_10.png",
+      tone: "goat",
+    },
+    season_most_active: {
+      label: "Most Active",
+      short: "ACT",
+      imageSrc: "/badges/ranked_regular.png",
+      tone: "regular",
+    },
+    win_streak: {
+      label: "Win Streak",
+      short: "WS",
+      imageSrc: "/badges/hot_streak.png",
+      tone: "fire",
+    },
+    battle_winner: {
+      label: "Battle Winner",
+      short: "BW",
+      imageSrc: "/badges/first_win.png",
+      tone: "champion",
+    },
   };
 
   if (knownBadges[badgeKey]) return knownBadges[badgeKey];
@@ -224,7 +313,54 @@ function getBadgeDisplay(badgeKey: string | null | undefined) {
     .slice(0, 3)
     .toUpperCase();
 
-  return { label: label || "Badge", short: short || "BDG" };
+  return {
+    label: label || "Badge",
+    short: short || "BDG",
+    imageSrc: null,
+    tone: "default",
+  };
+}
+
+function SelectedBadgeMark({
+  badge,
+  compact = false,
+}: {
+  badge: BadgeDisplay;
+  compact?: boolean;
+}) {
+  return (
+    <span
+      className={`battle-lobby-selected-badge battle-lobby-selected-badge-${badge.tone} ${
+        compact ? "battle-lobby-selected-badge-compact" : ""
+      }`}
+      title={badge.label}
+      aria-label={badge.label}
+    >
+      {badge.imageSrc ? (
+        <>
+          <img
+            src={badge.imageSrc}
+            alt=""
+            draggable={false}
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+              const fallback = event.currentTarget
+                .nextElementSibling as HTMLElement | null;
+
+              if (fallback) fallback.style.display = "inline-flex";
+            }}
+          />
+          <span className="battle-lobby-selected-badge-fallback">
+            {badge.short}
+          </span>
+        </>
+      ) : (
+        <span className="battle-lobby-selected-badge-fallback battle-lobby-selected-badge-fallback-visible">
+          {badge.short}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function normalizeChatForComparison(value: string): string {
@@ -242,6 +378,157 @@ function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = String(seconds % 60).padStart(2, "0");
   return `${mins}:${secs}`;
+}
+
+function getSampleDownloadFileName(sampleName: string | null): string {
+  const fallbackName = "battle-sample.mp3";
+  const rawName = sampleName?.trim() || fallbackName;
+
+  const safeName = rawName
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return safeName || fallbackName;
+}
+
+function getFriendlyUploadError(message?: string | null): string {
+  const normalized = (message ?? "").toLowerCase();
+
+  if (
+    normalized.includes("failed to fetch") ||
+    normalized.includes("network") ||
+    normalized.includes("timeout")
+  ) {
+    return "Upload didn’t go through. This is usually a temporary connection hiccup — please click Upload Track again. Your file is still selected.";
+  }
+
+  return "Upload didn’t go through. Please try again. If it keeps happening, refresh the page and rejoin the battle.";
+}
+
+type SampleAudioPlayerProps = {
+  src: string;
+  fileName: string | null;
+};
+
+function SampleAudioPlayer({ src, fileName }: SampleAudioPlayerProps) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [src]);
+
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const progress = safeDuration
+    ? Math.min(100, Math.max(0, (currentTime / safeDuration) * 100))
+    : 0;
+
+  const togglePlay = async () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+      return;
+    }
+
+    try {
+      await audio.play();
+      setIsPlaying(true);
+    } catch (err) {
+      console.warn("Could not play sample audio:", err);
+      setIsPlaying(false);
+    }
+  };
+
+  const handleScrub = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextTime = Number(event.target.value);
+    const audio = audioRef.current;
+
+    if (!Number.isFinite(nextTime)) return;
+
+    setCurrentTime(nextTime);
+
+    if (audio) {
+      audio.currentTime = nextTime;
+    }
+  };
+
+  return (
+    <div className="custom-sample-player">
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={() => {
+          const nextDuration = audioRef.current?.duration ?? 0;
+          setDuration(Number.isFinite(nextDuration) ? nextDuration : 0);
+        }}
+        onTimeUpdate={() => {
+          const nextTime = audioRef.current?.currentTime ?? 0;
+          setCurrentTime(Number.isFinite(nextTime) ? nextTime : 0);
+        }}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => {
+          if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+          }
+
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }}
+      />
+
+      <button
+        type="button"
+        className="custom-sample-play-button"
+        onClick={togglePlay}
+        aria-label={isPlaying ? "Pause sample preview" : "Play sample preview"}
+      >
+        <span
+          className={
+            isPlaying ? "custom-sample-pause-icon" : "custom-sample-play-icon"
+          }
+          aria-hidden="true"
+        />
+      </button>
+
+      <div className="custom-sample-player-body">
+        <div className="custom-sample-player-topline">
+          <span className="custom-sample-player-label">Sample preview</span>
+          <span className="custom-sample-player-time">
+            {formatDuration(Math.floor(currentTime))} /{" "}
+            {safeDuration ? formatDuration(Math.floor(safeDuration)) : "--:--"}
+          </span>
+        </div>
+
+        <input
+          type="range"
+          min={0}
+          max={safeDuration || 0}
+          step={0.1}
+          value={safeDuration ? Math.min(currentTime, safeDuration) : 0}
+          onChange={handleScrub}
+          className="custom-sample-scrubber"
+          style={{ "--sample-progress": `${progress}%` } as CSSProperties}
+          aria-label={`Scrub ${fileName ?? "sample preview"}`}
+          disabled={!safeDuration}
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function BattleLobby({ battleId, onLeave }: BattleLobbyProps) {
@@ -425,6 +712,8 @@ const submittedUsersLoadedRef = useRef(false);
   const [sampleUrl, setSampleUrl] = useState<string | null>(null);
   const [sampleLoading, setSampleLoading] = useState<boolean>(true);
   const [sampleError, setSampleError] = useState<string | null>(null);
+  const [sampleDownloading, setSampleDownloading] = useState(false);
+  const [sampleDownloadError, setSampleDownloadError] = useState<string | null>(null);
 
   // upload state
   const [file, setFile] = useState<File | null>(null);
@@ -496,6 +785,8 @@ const submittedUsersLoadedRef = useRef(false);
     setSampleUrl(null);
     setSampleLoading(true);
     setSampleError(null);
+    setSampleDownloadError(null);
+    setSampleDownloading(false);
     setFile(null);
     setUploading(false);
     setUploadError(null);
@@ -1710,9 +2001,7 @@ setLoadingSubmissions(false);
 
       if (uploadErr) {
         console.error("Storage upload error:", uploadErr);
-        setUploadError(
-          `Storage upload error: ${uploadErr.message ?? "unknown error"}`
-        );
+        setUploadError(getFriendlyUploadError(uploadErr.message));
         return;
       }
 
@@ -1749,7 +2038,7 @@ setLoadingSubmissions(false);
 // Stay on this screen until the shared lobby status changes to "voting" or "finished".
     } catch (err: any) {
       console.error("Unexpected upload error:", err);
-      setUploadError(err.message || "Failed to upload audio.");
+      setUploadError(getFriendlyUploadError(err?.message));
     } finally {
       setUploading(false);
     }
@@ -1873,6 +2162,46 @@ setLoadingSubmissions(false);
       }
     } finally {
       setVoteSubmitting(false);
+    }
+  };
+
+  const handleSampleDownload = async () => {
+    if (!sampleUrl || sampleDownloading) return;
+
+    setSampleDownloadError(null);
+    setSampleDownloading(true);
+
+    try {
+      const response = await fetch(sampleUrl, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}.`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = objectUrl;
+      link.download = getSampleDownloadFileName(sampleName);
+      link.style.display = "none";
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.setTimeout(() => {
+        window.URL.revokeObjectURL(objectUrl);
+      }, 1000);
+    } catch (err: any) {
+      console.error("Failed to download sample:", err);
+      setSampleDownloadError(
+        err?.message || "Could not download the sample. Please try again."
+      );
+    } finally {
+      setSampleDownloading(false);
     }
   };
 
@@ -2247,12 +2576,7 @@ useEffect(() => {
                           </span>
 
                           {selectedBadge && (
-                            <span
-                              className="battle-lobby-badge-pill"
-                              title={selectedBadge.label}
-                            >
-                              {selectedBadge.short}
-                            </span>
+                            <SelectedBadgeMark badge={selectedBadge} />
                           )}
 
                           <span className="battle-lobby-player-name">
@@ -2410,9 +2734,36 @@ useEffect(() => {
                             <h4>Sample for this battle</h4>
                           </div>
 
-                          {sampleUrl && (
-                            <span className="battle-sample-ready-chip">Ready</span>
-                          )}
+                          <button
+                            type="button"
+                            className="battle-sample-download-button"
+                            onClick={handleSampleDownload}
+                            disabled={!sampleUrl || sampleDownloading}
+                          >
+                            <span className="battle-sample-download-icon" aria-hidden="true">
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              >
+                                <path
+                                  d="M12 3v10.2m0 0 4.1-4.1M12 13.2 7.9 9.1"
+                                  stroke="currentColor"
+                                  strokeWidth="2.4"
+                                  strokeLinecap="square"
+                                  strokeLinejoin="miter"
+                                />
+                                <path
+                                  d="M5 14.5V20h14v-5.5"
+                                  stroke="currentColor"
+                                  strokeWidth="2.4"
+                                  strokeLinecap="square"
+                                  strokeLinejoin="miter"
+                                />
+                              </svg>
+                            </span>
+                            <span>{sampleDownloading ? "Downloading..." : "Download Sample"}</span>
+                          </button>
                         </div>
 
                         {sampleLoading && (
@@ -2433,14 +2784,16 @@ useEffect(() => {
                               {sampleName}
                             </p>
 
-                            <audio controls className="battle-audio-player">
-                              <source src={sampleUrl} />
-                              Your browser does not support the audio element.
-                            </audio>
+                            <SampleAudioPlayer
+                              src={sampleUrl}
+                              fileName={sampleName}
+                            />
 
-                            <p className="battle-production-muted battle-production-helper-text">
-                              Download the sample and drop it into FL Studio.
-                            </p>
+                            {sampleDownloadError && (
+                              <p className="battle-sample-download-error">
+                                {sampleDownloadError}
+                              </p>
+                            )}
                           </>
                         )}
                       </div>
@@ -2568,12 +2921,7 @@ useEffect(() => {
                               </span>
 
                               {selectedBadge && (
-                                <span
-                                  className="battle-lobby-badge-pill"
-                                  title={selectedBadge.label}
-                                >
-                                  {selectedBadge.short}
-                                </span>
+                                <SelectedBadgeMark badge={selectedBadge} compact />
                               )}
 
                               <strong>{displayName}</strong>

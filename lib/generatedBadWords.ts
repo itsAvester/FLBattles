@@ -1270,4 +1270,9 @@ export const GENERATED_BAD_WORDS = [
   "xxx",
   "ho",
   "ky",
+  "beat-battle",
+  "https://beat-battle.net",
+  "beat-battle.net",
+  "beat-battle . net",
+  "beat - battle . net"
 ] as const;

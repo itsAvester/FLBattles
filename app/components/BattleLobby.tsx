@@ -943,9 +943,11 @@ const loadChatMessages = async () => {
 
       if (lobbyErr || !lobbyData) {
         console.error("Failed to refresh lobby:", lobbyErr);
-        setLobbyError("Failed to load lobby.");
+        setLobbyError(lobby ? "Reconnecting to battle..." : "Failed to load lobby. Trying to reconnect...");
         return;
       }
+
+      setLobbyError(null);
 
       let lobbyRow = lobbyData as Lobby;
 
@@ -978,7 +980,29 @@ const loadChatMessages = async () => {
       if (playersErr) {
         console.error("Failed to refresh lobby players:", playersErr);
       } else if (playersData) {
-        const playerRows = playersData as LobbyPlayer[];
+        let playerRows = playersData as LobbyPlayer[];
+
+        // Once a battle starts, the locked battle_participants roster is the source of truth.
+        // Do not let mobile backgrounding / heartbeat pauses shrink the visible battle roster.
+        if (["in_progress", "voting", "finished"].includes(lobbyRow.status)) {
+          const { data: participantRows, error: participantErr } = await supabase
+            .from("battle_participants")
+            .select("user_id, joined_at")
+            .eq("battle_id", battleId)
+            .order("joined_at", { ascending: true });
+
+          if (participantErr) {
+            console.error("Failed to refresh battle participants:", participantErr);
+          } else if (participantRows && participantRows.length > 0) {
+            playerRows = participantRows.map((participant: any) => ({
+              id: `participant-${participant.user_id}`,
+              lobby_id: battleId,
+              user_id: participant.user_id,
+              joined_at: participant.joined_at ?? lobbyRow.battle_started_at ?? lobbyRow.created_at,
+            }));
+          }
+        }
+
         setPlayers(playerRows);
 
         const playerProfileKey = playerRows.map((player) => player.user_id).join("|");
@@ -1249,20 +1273,29 @@ const loadChatMessages = async () => {
     return () => window.clearInterval(interval);
   }, [battleId]);
 
-  // Browser tabs can sleep in the background. Refresh immediately when users come back.
+  // Browser tabs and mobile apps can sleep in the background.
+  // Refresh immediately when the player returns, refocuses, or reconnects.
   useEffect(() => {
     if (!battleId) return;
 
+    const handleResume = () => {
+      refreshLobbyState();
+    };
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
-        refreshLobbyState();
+        handleResume();
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleResume);
+    window.addEventListener("online", handleResume);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleResume);
+      window.removeEventListener("online", handleResume);
     };
   }, [battleId]);
 
@@ -1812,48 +1845,75 @@ useEffect(() => {
         setLoadingSubmissions(false);
         return;
       }
-      const { data: lobbyPlayers, error: playersError } = await supabase
-  .from("battle_lobby_players")
-  .select("user_id")
-  .eq("lobby_id", battleId)
-  .is("left_at", null);
+      const { data: participantRows, error: participantsError } = await supabase
+  .from("battle_participants")
+  .select("user_id, joined_at")
+  .eq("battle_id", battleId)
+  .order("joined_at", { ascending: true });
 
-if (playersError) {
-  console.error("Error loading lobby players:", playersError);
+if (participantsError) {
+  console.error("Error loading battle participants:", participantsError);
 }
 
-const totalPlayers = lobbyPlayers?.length ?? 0;
-const totalSubmissions = data?.length ?? 0;
+let battlePlayers = participantRows ?? [];
 
-setMissingSubmissionCount(Math.max(totalPlayers - totalSubmissions, 0));
+// Fallback for older battles that may have been created before battle_participants was reliable.
+if (battlePlayers.length === 0) {
+  const { data: fallbackLobbyPlayers, error: fallbackPlayersError } = await supabase
+    .from("battle_lobby_players")
+    .select("user_id, joined_at")
+    .eq("lobby_id", battleId)
+    .order("joined_at", { ascending: true });
+
+  if (fallbackPlayersError) {
+    console.error("Error loading fallback lobby players:", fallbackPlayersError);
+  }
+
+  battlePlayers = fallbackLobbyPlayers ?? [];
+}
+
+const submittedIds = new Set((data ?? []).map((submission: any) => submission.user_id));
+const participantIds = new Set((battlePlayers ?? []).map((player: any) => player.user_id));
+const missingPlayers = Array.from(participantIds).filter(
+  (userId) => !submittedIds.has(userId)
+);
+
+setMissingSubmissionCount(missingPlayers.length);
 
 const allUserIds = Array.from(
   new Set([
-    ...(lobbyPlayers ?? []).map((p: any) => p.user_id),
+    ...(battlePlayers ?? []).map((p: any) => p.user_id),
     ...(data ?? []).map((s: any) => s.user_id),
   ])
 );
 
-const { data: profilesData } = await supabase
-  .from("profiles")
-  .select("id, display_name")
-  .in("id", allUserIds);
+const profilesResult = allUserIds.length > 0
+  ? await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", allUserIds)
+  : { data: [] as any[] };
+
+const profilesData = profilesResult.data ?? [];
 
 const profileNameById = new Map(
-  (profilesData ?? []).map((profile: any) => [
+  profilesData.map((profile: any) => [
     profile.id,
     profile.display_name || "Unnamed Producer",
   ])
 );
 
-const lobbyPlayersWithNames: LobbyPlayer[] = (lobbyPlayers ?? []).map(
+const battlePlayersWithNames: LobbyPlayer[] = (battlePlayers ?? []).map(
   (player: any) => ({
-    ...player,
+    id: `participant-${player.user_id}`,
+    lobby_id: battleId,
+    user_id: player.user_id,
+    joined_at: player.joined_at ?? "",
     displayName: profileNameById.get(player.user_id) ?? "Unnamed Producer",
   })
 );
 
-setPlayers(lobbyPlayersWithNames);
+setPlayers(battlePlayersWithNames);
 
 const seen = new Set<string>();
 const uniqueRows: any[] = [];
@@ -1962,16 +2022,30 @@ setLoadingSubmissions(false);
     }
 
 
-    const uploadWindowOpen = matchStarted && phase !== "results" && timeLeft > 0;
-
-    if (!uploadWindowOpen) {
-      setUploadError("Upload window has closed for this battle.");
-      return;
-    }
-
     setUploading(true);
 
     try {
+      const { data: uploadWindowLobby, error: uploadWindowError } = await supabase
+        .from("battle_lobbies")
+        .select("status, upload_ends_at")
+        .eq("id", battleId)
+        .single();
+
+      if (uploadWindowError || !uploadWindowLobby) {
+        throw new Error("Could not verify the upload window. Please try again.");
+      }
+
+      const uploadEndsAt = uploadWindowLobby.upload_ends_at
+        ? new Date(uploadWindowLobby.upload_ends_at).getTime()
+        : null;
+      const serverUploadWindowOpen =
+        uploadWindowLobby.status === "in_progress" &&
+        (uploadEndsAt === null || Date.now() < uploadEndsAt);
+
+      if (!serverUploadWindowOpen) {
+        setUploadError("Upload window has closed for this battle.");
+        return;
+      }
       const {
         data: { user },
         error: userError,
@@ -2205,8 +2279,17 @@ setLoadingSubmissions(false);
     }
   };
 
-  const uploadWindowOpen =
-    matchStarted && phase !== "results" && timeLeft > 0;
+  const uploadWindowOpen = (() => {
+    if (!matchStarted || phase === "results") return false;
+
+    if (lobby?.status === "in_progress") {
+      if (!lobby.upload_ends_at) return timeLeft > 0;
+      return Date.now() < new Date(lobby.upload_ends_at).getTime();
+    }
+
+    // Keep local debug force-start usable in development.
+    return !!debugStartTime && timeLeft > 0;
+  })();
 
   // ───────────────── LEAVE / PENALTY ─────────────────
 

@@ -15191,3 +15191,18 @@ button.battle-custom-segment-active:hover {
     justify-content: flex-start;
   }
 }
+
+/* =========================================================
+   BATTLE CHAT MUTED STATE
+   ========================================================= */
+
+.battle-chat-muted-state {
+  width: fit-content;
+  margin: auto 0 !important;
+  color: #ffb4b4 !important;
+  font-size: 0.86rem;
+  font-weight: 900;
+  line-height: 1.55;
+  text-transform: none;
+  letter-spacing: 0.01em;
+}

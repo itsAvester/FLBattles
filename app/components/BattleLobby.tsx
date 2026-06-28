@@ -3312,64 +3312,74 @@ useEffect(() => {
                   </div>
 
                   <div ref={chatScrollRef} className="battle-chat-message-list">
-                    {chatLoading && (
-                      <p className="battle-chat-empty">Loading chat...</p>
-                    )}
-
-                    {!chatLoading && chatMessages.length === 0 && (
-                      <p className="battle-chat-empty">
-                        No messages yet. Keep it clean and lobby-specific.
+                    {chatMuted ? (
+                      <p className="battle-chat-empty battle-chat-muted-state">
+                        Chat Muted
                       </p>
-                    )}
+                    ) : (
+                      <>
+                        {chatLoading && (
+                          <p className="battle-chat-empty">Loading chat...</p>
+                        )}
 
-                    {!chatLoading &&
-                      chatMessages.map((message) => {
-                        const profile = playerProfilesById[message.user_id];
-                        const displayName =
-                          profile?.displayName ??
-                          (message.user_id === currentUserId ? "You" : "Producer");
-                        const rating = profile?.rating ?? 0;
-                        const ratingRank = getRankFromRating(rating);
-                        const rank = topTenUserIds.has(message.user_id)
-                          ? "Top 10"
-                          : ratingRank;
-                        const rankTheme = getRankTheme(rank);
-                        const selectedBadge = getBadgeDisplay(
-                          profile?.selectedBadgeKey
-                        );
-                        const isSelfMessage = message.user_id === currentUserId;
+                        {!chatLoading && chatMessages.length === 0 && (
+                          <p className="battle-chat-empty">
+                            No messages yet. Keep it clean and lobby-specific.
+                          </p>
+                        )}
 
-                        return (
-                          <article
-                            key={message.id}
-                            className={`battle-chat-message ${
-                              isSelfMessage ? "battle-chat-message-self" : ""
-                            }`}
-                          >
-                            <div className="battle-chat-message-meta">
-                              <span
-                                className="battle-lobby-rank-pill battle-chat-rank-pill"
-                                style={{
-                                  color: rankTheme.text,
-                                  borderColor: rankTheme.border,
-                                  background: rankTheme.background,
-                                  boxShadow: rankTheme.glow,
-                                }}
+                        {!chatLoading &&
+                          chatMessages.map((message) => {
+                            const profile = playerProfilesById[message.user_id];
+                            const displayName =
+                              profile?.displayName ??
+                              (message.user_id === currentUserId
+                                ? "You"
+                                : "Producer");
+                            const rating = profile?.rating ?? 0;
+                            const ratingRank = getRankFromRating(rating);
+                            const rank = topTenUserIds.has(message.user_id)
+                              ? "Top 10"
+                              : ratingRank;
+                            const rankTheme = getRankTheme(rank);
+                            const selectedBadge = getBadgeDisplay(
+                              profile?.selectedBadgeKey
+                            );
+                            const isSelfMessage = message.user_id === currentUserId;
+
+                            return (
+                              <article
+                                key={message.id}
+                                className={`battle-chat-message ${
+                                  isSelfMessage ? "battle-chat-message-self" : ""
+                                }`}
                               >
-                                {rank}
-                              </span>
+                                <div className="battle-chat-message-meta">
+                                  <span
+                                    className="battle-lobby-rank-pill battle-chat-rank-pill"
+                                    style={{
+                                      color: rankTheme.text,
+                                      borderColor: rankTheme.border,
+                                      background: rankTheme.background,
+                                      boxShadow: rankTheme.glow,
+                                    }}
+                                  >
+                                    {rank}
+                                  </span>
 
-                              {selectedBadge && (
-                                <SelectedBadgeMark badge={selectedBadge} compact />
-                              )}
+                                  {selectedBadge && (
+                                    <SelectedBadgeMark badge={selectedBadge} compact />
+                                  )}
 
-                              <strong>{displayName}</strong>
-                            </div>
+                                  <strong>{displayName}</strong>
+                                </div>
 
-                            <p>{message.message}</p>
-                          </article>
-                        );
-                      })}
+                                <p>{message.message}</p>
+                              </article>
+                            );
+                          })}
+                      </>
+                    )}
                   </div>
 
                   <form
@@ -3423,11 +3433,6 @@ useEffect(() => {
                         </svg>
                       </button>
 
-                      {chatMuted && (
-                        <span className="battle-chat-muted-text">
-                          Chat is muted.
-                        </span>
-                      )}
                     </div>
 
                     <span>4s cooldown</span>

@@ -74,6 +74,9 @@ export default function NavBar() {
         <Link href="/faq" onClick={closeMenu}>
           FAQ
         </Link>
+        <Link href="/report" onClick={closeMenu}>
+          Support
+        </Link>
 
         <div className="nav-account-block">
           {loading ? (

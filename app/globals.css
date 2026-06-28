@@ -15096,3 +15096,98 @@ button.battle-custom-segment-active:hover {
     justify-content: flex-start;
   }
 }
+
+/* =========================================================
+   BATTLE CHAT MUTE BUTTON
+   ========================================================= */
+
+.battle-chat-foot {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.battle-chat-mute-control {
+  min-width: 0;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.battle-chat-mute-button {
+  width: 30px;
+  min-width: 30px;
+  height: 24px;
+  min-height: 24px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(244, 241, 232, 0.72);
+  box-shadow: none;
+}
+
+.battle-chat-mute-button:hover {
+  transform: none !important;
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.11);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.battle-chat-mute-button-active,
+.battle-chat-mute-button-active:hover {
+  border-color: rgba(239, 68, 68, 0.72);
+  background: rgba(239, 68, 68, 0.2);
+  color: #ffb4b4;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.16);
+}
+
+.battle-chat-mute-icon {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.battle-chat-mute-icon path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.battle-chat-muted-text {
+  min-width: 0;
+  color: #ffb4b4;
+  font-size: 0.62rem;
+  font-weight: 950;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  white-space: nowrap;
+}
+
+.battle-lobby-live-area-production .battle-chat-mute-button {
+  width: 28px;
+  min-width: 28px;
+  height: 22px;
+  min-height: 22px !important;
+}
+
+.battle-lobby-live-area-production .battle-chat-muted-text {
+  font-size: 0.55rem !important;
+}
+
+@media (max-width: 640px) {
+  .battle-chat-foot {
+    gap: 8px;
+  }
+
+  .battle-chat-mute-control {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+}

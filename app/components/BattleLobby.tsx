@@ -12,6 +12,7 @@ const PRODUCTION_WARNING_SECONDS = [60, 50, 40, 30, 20, 10];
 const CHAT_MESSAGE_LIMIT = 300;
 const CHAT_COOLDOWN_MS = 4000;
 const CHAT_HISTORY_LIMIT = 80;
+const CHAT_MUTE_STORAGE_KEY = "flbattles.chatMuted";
 
 
 type Phase = "countdown" | "upload" | "results";
@@ -839,6 +840,8 @@ const submittedUsersLoadedRef = useRef(false);
   const [chatLoading, setChatLoading] = useState(false);
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [chatMuted, setChatMuted] = useState(false);
+  const [chatMuteLoaded, setChatMuteLoaded] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const lastChatSentAtRef = useRef<number>(0);
 
@@ -857,6 +860,29 @@ const submittedUsersLoadedRef = useRef(false);
     !!lobby &&
     (lobby.status === "searching" || lobby.status === "in_progress") &&
     phase !== "results";
+
+  useEffect(() => {
+    try {
+      setChatMuted(window.localStorage.getItem(CHAT_MUTE_STORAGE_KEY) === "true");
+    } catch (err) {
+      console.warn("Could not read chat mute setting:", err);
+    } finally {
+      setChatMuteLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!chatMuteLoaded) return;
+
+    try {
+      window.localStorage.setItem(
+        CHAT_MUTE_STORAGE_KEY,
+        chatMuted ? "true" : "false"
+      );
+    } catch (err) {
+      console.warn("Could not save chat mute setting:", err);
+    }
+  }, [chatMuted, chatMuteLoaded]);
 
   // leaving / penalty
   const [leaving, setLeaving] = useState(false);
@@ -2687,6 +2713,10 @@ const handleSendChatMessage = async (event: React.FormEvent<HTMLFormElement>) =>
   setChatSending(false);
 };
 
+const toggleChatMuted = () => {
+  setChatMuted((prev) => !prev);
+};
+
 const submittedUserIdsFromLoadedSubmissions = new Set(
   submissions.map((s) => s.user_id)
 );
@@ -3369,6 +3399,37 @@ useEffect(() => {
                     <span>
                       {chatDraft.length}/{CHAT_MESSAGE_LIMIT}
                     </span>
+
+                    <div className="battle-chat-mute-control">
+                      <button
+                        type="button"
+                        className={`battle-chat-mute-button ${
+                          chatMuted ? "battle-chat-mute-button-active" : ""
+                        }`}
+                        aria-pressed={chatMuted}
+                        aria-label={chatMuted ? "Unmute chat" : "Mute chat"}
+                        title={chatMuted ? "Unmute chat" : "Mute chat"}
+                        onClick={toggleChatMuted}
+                      >
+                        <svg
+                          className="battle-chat-mute-icon"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                          focusable="false"
+                        >
+                          <path d="M4 9.5v5h3.3L12 19V5L7.3 9.5H4Z" />
+                          <path d="M16 9l5 5" />
+                          <path d="M21 9l-5 5" />
+                        </svg>
+                      </button>
+
+                      {chatMuted && (
+                        <span className="battle-chat-muted-text">
+                          Chat is muted.
+                        </span>
+                      )}
+                    </div>
+
                     <span>4s cooldown</span>
                   </div>
 

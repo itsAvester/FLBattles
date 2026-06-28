@@ -40,6 +40,7 @@ export default function SiteFooter() {
             <span>Copyright</span>
             <Link href="/legal/sample-submission-terms">Sample Submission Terms</Link>
             <Link href="/legal/copyright">Copyright Policy</Link>
+            <Link href="/report">Report an Issue</Link>
             <a href="mailto:support@flbattles.com">Contact</a>
           </div>
         </nav>

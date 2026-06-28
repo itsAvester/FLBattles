@@ -355,18 +355,35 @@ export default function BattleResults({ battleId }: BattleResultsProps) {
           </p>
         </div>
 
-        <div className="battle-results-summary-grid">
-          <div className="battle-results-summary-card">
-            <span>Winner</span>
-            <strong>{winnerName}</strong>
+        <div className="battle-results-summary-wrap">
+          <div className="battle-results-summary-grid">
+            <div className="battle-results-summary-card">
+              <span>Winner</span>
+              <strong>{winnerName}</strong>
+            </div>
+            <div className="battle-results-summary-card">
+              <span>{isHostVote ? "Voting style" : "Total votes"}</span>
+              <strong>{isHostVote ? "Host" : totalVotes}</strong>
+            </div>
+            <div className="battle-results-summary-card">
+              <span>Submissions</span>
+              <strong>{rows.length}</strong>
+            </div>
           </div>
-          <div className="battle-results-summary-card">
-            <span>{isHostVote ? "Voting style" : "Total votes"}</span>
-            <strong>{isHostVote ? "Host" : totalVotes}</strong>
-          </div>
-          <div className="battle-results-summary-card">
-            <span>Submissions</span>
-            <strong>{rows.length}</strong>
+
+          <div className="battle-results-report-row" aria-label="Report options">
+            <a
+              className="battle-context-report-link"
+              href={`/report?type=bug&category=results&battleId=${encodeURIComponent(battleId)}`}
+            >
+              Report issue
+            </a>
+            <a
+              className="battle-context-report-link"
+              href={`/report?type=player&battleId=${encodeURIComponent(battleId)}`}
+            >
+              Report player
+            </a>
           </div>
         </div>
       </section>

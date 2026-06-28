@@ -2793,6 +2793,21 @@ useEffect(() => {
           <div className="battle-lobby-id-card">
             <span className="battle-lobby-id-label">Lobby ID</span>
             <code className="battle-lobby-id-value">{battleId}</code>
+
+            <div className="battle-lobby-report-links" aria-label="Report options">
+              <a
+                className="battle-context-report-link"
+                href={`/report?type=bug&category=lobby&battleId=${encodeURIComponent(battleId)}`}
+              >
+                Report issue
+              </a>
+              <a
+                className="battle-context-report-link"
+                href={`/report?type=player&battleId=${encodeURIComponent(battleId)}`}
+              >
+                Report player
+              </a>
+            </div>
           </div>
 
         </div>

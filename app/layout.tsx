@@ -66,7 +66,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div className="beta-banner">
           <span className="beta-pill">LIVE BETA</span>
           <span>
-            The first online beat battle platform · Host a private beat battle in seconds · Invite friends with a lobby
+            Custom lobby bug fixed! · Host a private beat battle in seconds · Invite friends with a lobby
             link · <RegisteredProducerCount suffix="+ producers joined" />
           </span>
         </div>

@@ -583,6 +583,7 @@ const lastLoadedPlayerProfileKeyRef = useRef<string>("");
 const minPlayersSoundPlayedRef = useRef(false);
 const finalCountdownPlayedForRef = useRef<Set<number>>(new Set());
 const warningTimerLastValueRef = useRef<number | null>(null);
+const uploadProgressTimerRef = useRef<number | null>(null);
 
 const playMatchStartSound = () => {
   try {
@@ -756,6 +757,7 @@ const submittedUsersLoadedRef = useRef(false);
   // upload state
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadDone, setUploadDone] = useState(false);
 
@@ -827,6 +829,7 @@ const submittedUsersLoadedRef = useRef(false);
     setSampleDownloading(false);
     setFile(null);
     setUploading(false);
+    setUploadProgress(0);
     setUploadError(null);
     setUploadDone(false);
     setUpdatingStats(false);
@@ -856,6 +859,11 @@ const submittedUsersLoadedRef = useRef(false);
     minPlayersSoundPlayedRef.current = false;
     finalCountdownPlayedForRef.current = new Set();
     warningTimerLastValueRef.current = null;
+
+    if (uploadProgressTimerRef.current !== null) {
+      window.clearInterval(uploadProgressTimerRef.current);
+      uploadProgressTimerRef.current = null;
+    }
   }, [battleId]);
 
   const showLobbyBlockOverlay = () => {
@@ -2054,12 +2062,14 @@ setLoadingSubmissions(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
+    setUploadProgress(0);
     const f = e.target.files?.[0] ?? null;
     setFile(f);
   };
 
   const handleUpload = async () => {
     setUploadError(null);
+    setUploadProgress(0);
 
     if (!battleId || !battleId.trim()) {
       console.error("Missing battleId in handleUpload:", battleId);
@@ -2074,8 +2084,35 @@ setLoadingSubmissions(false);
       return;
     }
 
+    const clearUploadProgressTimer = () => {
+      if (uploadProgressTimerRef.current !== null) {
+        window.clearInterval(uploadProgressTimerRef.current);
+        uploadProgressTimerRef.current = null;
+      }
+    };
+
+    const beginUploadProgressDrift = () => {
+      clearUploadProgressTimer();
+
+      uploadProgressTimerRef.current = window.setInterval(() => {
+        setUploadProgress((prev) => {
+          // Drift slowly while Supabase Storage is working.
+          // It intentionally parks below 90% until the upload + database save actually finish.
+          if (prev >= 86) return prev;
+
+          const increment =
+            prev < 30 ? 4 :
+            prev < 60 ? 2 :
+            prev < 78 ? 1 :
+            0.4;
+
+          return Math.min(prev + increment, 86);
+        });
+      }, 420);
+    };
 
     setUploading(true);
+    setUploadProgress(6);
 
     try {
       const { data: uploadWindowLobby, error: uploadWindowError } = await supabase
@@ -2083,6 +2120,8 @@ setLoadingSubmissions(false);
         .select("status, upload_ends_at")
         .eq("id", battleId)
         .single();
+
+      setUploadProgress(12);
 
       if (uploadWindowError || !uploadWindowLobby) {
         throw new Error("Could not verify the upload window. Please try again.");
@@ -2097,8 +2136,12 @@ setLoadingSubmissions(false);
 
       if (!serverUploadWindowOpen) {
         setUploadError("Upload window has closed for this battle.");
+        setUploadProgress(0);
         return;
       }
+
+      setUploadProgress(18);
+
       const {
         data: { user },
         error: userError,
@@ -2107,6 +2150,8 @@ setLoadingSubmissions(false);
       if (userError || !user) {
         throw new Error("You must be logged in to upload.");
       }
+
+      setUploadProgress(24);
 
       const safeName = file.name
         .replace(/[^a-zA-Z0-9._-]/g, "_")
@@ -2119,6 +2164,8 @@ setLoadingSubmissions(false);
       // without creating a second DB row or orphaning new timestamped files.
       const path = `${user.id}/${battleId}/submission.${extension}`;
 
+      beginUploadProgressDrift();
+
       const { error: uploadErr } = await supabase.storage
         .from("battle-audio")
         .upload(path, file, {
@@ -2126,11 +2173,16 @@ setLoadingSubmissions(false);
           upsert: true,
         });
 
+      clearUploadProgressTimer();
+
       if (uploadErr) {
         console.error("Storage upload error:", uploadErr);
         setUploadError(getFriendlyUploadError(uploadErr.message));
+        setUploadProgress(0);
         return;
       }
+
+      setUploadProgress(90);
 
       const { error: submissionErr } = await supabase
         .from("battle_submissions")
@@ -2151,8 +2203,11 @@ setLoadingSubmissions(false);
         setUploadError(
           `Database error: ${submissionErr.message ?? "unknown error"}`
         );
+        setUploadProgress(0);
         return;
       }
+
+      setUploadProgress(96);
 
       setUploadDone(true);
       setSubmittedUserIds((prev) => {
@@ -2160,13 +2215,18 @@ setLoadingSubmissions(false);
         next.add(user.id);
         return next;
       });
+
       await refreshLobbyState();
+
+      setUploadProgress(100);
 // Do NOT immediately switch to results.
 // Stay on this screen until the shared lobby status changes to "voting" or "finished".
     } catch (err: any) {
       console.error("Unexpected upload error:", err);
       setUploadError(getFriendlyUploadError(err?.message));
+      setUploadProgress(0);
     } finally {
+      clearUploadProgressTimer();
       setUploading(false);
     }
   };
@@ -2989,14 +3049,45 @@ useEffect(() => {
 
                         <button
                           onClick={handleUpload}
-                          className="btn-primary battle-upload-button"
+                          className={`btn-primary battle-upload-button ${
+                            uploading || uploadDone
+                              ? "battle-upload-button-progress-active"
+                              : ""
+                          } ${
+                            uploadDone
+                              ? "battle-upload-button-progress-complete"
+                              : ""
+                          }`}
+                          style={
+                            {
+                              "--battle-upload-progress": `${uploadProgress}%`,
+                            } as CSSProperties
+                          }
+                          aria-label={
+                            uploading
+                              ? "Uploading track"
+                              : uploadDone
+                              ? "Track uploaded"
+                              : "Upload track"
+                          }
                           disabled={!uploadWindowOpen || uploading || uploadDone || !file}
                         >
-                          {uploading
-                            ? "Uploading..."
-                            : uploadDone
-                            ? "Uploaded"
-                            : "Upload Track"}
+                          {(uploading || uploadDone) && (
+                            <span
+                              className="battle-upload-button-progress-fill"
+                              aria-hidden="true"
+                            />
+                          )}
+
+                          <span
+                            className={
+                              uploading || uploadDone
+                                ? "battle-upload-button-label battle-upload-button-label-hidden"
+                                : "battle-upload-button-label"
+                            }
+                          >
+                            Upload Track
+                          </span>
                         </button>
 
                         {uploadError && (

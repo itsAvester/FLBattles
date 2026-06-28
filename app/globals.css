@@ -14622,3 +14622,98 @@ button.battle-custom-segment-active:hover {
   height: 22px;
   min-width: 22px;
 }
+
+
+/* =========================================================
+   LOBBY BLOCK OVERLAY
+   ========================================================= */
+
+.lobby-block-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 77, 28, 0.18), transparent 32%),
+    rgba(0, 0, 0, 0.74);
+  backdrop-filter: blur(14px);
+}
+
+.lobby-block-card {
+  position: relative;
+  width: min(460px, 100%);
+  padding: 28px;
+  overflow: hidden;
+  text-align: center;
+  border: 1px solid rgba(255, 77, 28, 0.42);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 77, 28, 0.18), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent),
+    rgba(8, 8, 8, 0.98);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.72),
+    0 0 34px rgba(255, 77, 28, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.lobby-block-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+  opacity: 0.42;
+}
+
+.lobby-block-kicker,
+.lobby-block-card h2,
+.lobby-block-card p,
+.lobby-block-button {
+  position: relative;
+  z-index: 1;
+}
+
+.lobby-block-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  margin-bottom: 14px;
+  padding: 0 10px;
+  color: var(--orange);
+  border: 1px solid rgba(255, 77, 28, 0.36);
+  background: rgba(255, 77, 28, 0.1);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.lobby-block-card h2 {
+  margin: 0;
+  font-family: var(--font-manrope), Inter, ui-sans-serif, system-ui, sans-serif;
+  color: var(--text);
+  font-size: clamp(2rem, 7vw, 3.2rem);
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.07em;
+}
+
+.lobby-block-card p {
+  max-width: 340px;
+  margin: 14px auto 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+.lobby-block-button {
+  margin-top: 22px;
+}

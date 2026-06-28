@@ -16,6 +16,42 @@ type LobbyRpcResponse = {
   out_player_count?: number;
 };
 
+
+type LobbyBlockOverlay = {
+  title: string;
+  message: string;
+};
+
+const LOBBY_BLOCK_TITLE = "Already in a lobby";
+const LOBBY_BLOCK_MESSAGE = "You must leave your previous lobby to join a new one.";
+
+function isLobbyBlockError(message?: string | null): boolean {
+  const normalized = (message ?? "").toLowerCase();
+
+  return (
+    normalized.includes("already in an active battle") ||
+    normalized.includes("finish or leave") ||
+    normalized.includes("previous lobby") ||
+    normalized.includes("already in a lobby")
+  );
+}
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+
+  if (
+    err &&
+    typeof err === "object" &&
+    "message" in err &&
+    typeof (err as { message?: unknown }).message === "string"
+  ) {
+    return (err as { message: string }).message;
+  }
+
+  return fallback;
+}
+
+
 const BATTLE_DURATIONS = [
   { label: "5 min", seconds: 5 * 60 },
   { label: "10 min", seconds: 10 * 60 },
@@ -33,6 +69,8 @@ export default function BattleQueue() {
 
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [lobbyBlockOverlay, setLobbyBlockOverlay] =
+    useState<LobbyBlockOverlay | null>(null);
 
   const [showCustomSetup, setShowCustomSetup] = useState(false);
   const [showJoinCustom, setShowJoinCustom] = useState(false);
@@ -51,6 +89,37 @@ export default function BattleQueue() {
   const resetError = () => {
     if (error) setError(null);
     if (status === "error") setStatus("idle");
+    setLobbyBlockOverlay(null);
+  };
+
+  const showLobbyBlockOverlay = () => {
+    setLobbyBlockOverlay({
+      title: LOBBY_BLOCK_TITLE,
+      message: LOBBY_BLOCK_MESSAGE,
+    });
+    setError(null);
+  };
+
+  const handleActionError = (err: unknown, fallback: string) => {
+    const message = getErrorMessage(err, fallback);
+
+    if (isLobbyBlockError(message)) {
+      showLobbyBlockOverlay();
+      return;
+    }
+
+    setError(message);
+  };
+
+  const ensureCanEnterNewLobby = async (userId: string) => {
+    const { error } = await supabase.rpc("assert_user_can_enter_new_lobby", {
+      p_user_id: userId,
+    });
+
+    if (error) {
+      console.error("Active lobby preflight error:", error.message, error);
+      throw new Error(error.message || LOBBY_BLOCK_MESSAGE);
+    }
   };
 
   const getCurrentUser = async () => {
@@ -69,6 +138,7 @@ export default function BattleQueue() {
   const handleFindRankedMatch = async () => {
     setStatus("searching");
     setError(null);
+    setLobbyBlockOverlay(null);
 
     try {
       const user = await getCurrentUser();
@@ -93,8 +163,8 @@ export default function BattleQueue() {
       }
 
       router.push(`/battles/${lobbyId}?mode=ranked`);
-    } catch (err: any) {
-      setError(err?.message || "Failed to find a ranked match.");
+    } catch (err: unknown) {
+      handleActionError(err, "Failed to find a ranked match.");
       setStatus("error");
     }
   };
@@ -139,9 +209,11 @@ export default function BattleQueue() {
   const handleCreateCustomLobby = async () => {
     setStatus("creating");
     setError(null);
+    setLobbyBlockOverlay(null);
 
     try {
       const user = await getCurrentUser();
+      await ensureCanEnterNewLobby(user.id);
 
       const boundedMaxPlayers = Math.min(Math.max(Number(customMaxPlayers), 2), 30);
 
@@ -181,8 +253,8 @@ export default function BattleQueue() {
       }
 
       router.push(`/battles/${lobbyId}?mode=custom`);
-    } catch (err: any) {
-      setError(err?.message || "Failed to create custom lobby.");
+    } catch (err: unknown) {
+      handleActionError(err, "Failed to create custom lobby.");
       setStatus("error");
     }
   };
@@ -190,6 +262,7 @@ export default function BattleQueue() {
   const handleJoinCustomLobby = async () => {
     setStatus("joining");
     setError(null);
+    setLobbyBlockOverlay(null);
 
     try {
       await getCurrentUser();
@@ -217,14 +290,36 @@ export default function BattleQueue() {
       const returnedLobbyId = row?.out_lobby_id ?? row?.lobby_id ?? lobbyId;
 
       router.push(`/battles/${returnedLobbyId}?mode=custom`);
-    } catch (err: any) {
-      setError(err?.message || "Failed to join custom lobby.");
+    } catch (err: unknown) {
+      handleActionError(err, "Failed to join custom lobby.");
       setStatus("error");
     }
   };
 
   return (
     <div className="card battle-queue-card">
+      {lobbyBlockOverlay && (
+        <div
+          className="lobby-block-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="lobby-block-title"
+        >
+          <div className="lobby-block-card">
+            <span className="lobby-block-kicker">Battle already active</span>
+            <h2 id="lobby-block-title">{lobbyBlockOverlay.title}</h2>
+            <p>{lobbyBlockOverlay.message}</p>
+
+            <button
+              type="button"
+              className="btn-primary lobby-block-button"
+              onClick={() => setLobbyBlockOverlay(null)}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
       <div className="battle-queue-head">
         <div>
           <p className="panel-label">Battle queue</p>

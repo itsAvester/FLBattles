@@ -406,6 +406,42 @@ function getFriendlyUploadError(message?: string | null): string {
   return "Upload didn’t go through. Please try again. If it keeps happening, refresh the page and rejoin the battle.";
 }
 
+
+type LobbyBlockOverlay = {
+  title: string;
+  message: string;
+};
+
+const LOBBY_BLOCK_TITLE = "Already in a lobby";
+const LOBBY_BLOCK_MESSAGE = "You must leave your previous lobby to join a new one.";
+
+function isLobbyBlockError(message?: string | null): boolean {
+  const normalized = (message ?? "").toLowerCase();
+
+  return (
+    normalized.includes("already in an active battle") ||
+    normalized.includes("finish or leave") ||
+    normalized.includes("previous lobby") ||
+    normalized.includes("already in a lobby")
+  );
+}
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+
+  if (
+    err &&
+    typeof err === "object" &&
+    "message" in err &&
+    typeof (err as { message?: unknown }).message === "string"
+  ) {
+    return (err as { message: string }).message;
+  }
+
+  return fallback;
+}
+
+
 type SampleAudioPlayerProps = {
   src: string;
   fileName: string | null;
@@ -680,6 +716,8 @@ const [topTenUserIds, setTopTenUserIds] = useState<Set<string>>(new Set());
 const [submittedUserIds, setSubmittedUserIds] = useState<Set<string>>(new Set());
 const submittedUsersLoadedRef = useRef(false);
   const [lobbyError, setLobbyError] = useState<string | null>(null);
+  const [lobbyBlockOverlay, setLobbyBlockOverlay] =
+    useState<LobbyBlockOverlay | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [matchStarted, setMatchStarted] = useState(false);
   const [autoStartEta, setAutoStartEta] = useState<number | null>(null);
@@ -811,6 +849,7 @@ const submittedUsersLoadedRef = useRef(false);
     lastChatSentAtRef.current = 0;
     setLeaving(false);
     setLeaveError(null);
+    setLobbyBlockOverlay(null);
     previousPlayerIdsRef.current = new Set();
     playersLoadedOnceRef.current = false;
     lastLoadedPlayerProfileKeyRef.current = "";
@@ -818,6 +857,14 @@ const submittedUsersLoadedRef = useRef(false);
     finalCountdownPlayedForRef.current = new Set();
     warningTimerLastValueRef.current = null;
   }, [battleId]);
+
+  const showLobbyBlockOverlay = () => {
+    setLobbyBlockOverlay({
+      title: LOBBY_BLOCK_TITLE,
+      message: LOBBY_BLOCK_MESSAGE,
+    });
+    setLobbyError(null);
+  };
 
   // ───────────────── LOBBY: fetch & realtime ─────────────────
 const loadPlayerNames = async (playerRows: LobbyPlayer[]) => {
@@ -1107,7 +1154,13 @@ const loadChatMessages = async () => {
 
       if (error) {
         console.error("Failed to join custom lobby from link:", error);
-        setLobbyError(error.message || "Could not join this custom lobby.");
+
+        if (isLobbyBlockError(error.message)) {
+          showLobbyBlockOverlay();
+        } else {
+          setLobbyError(error.message || "Could not join this custom lobby.");
+        }
+
         return;
       }
 
@@ -2491,6 +2544,28 @@ useEffect(() => {
 
   return (
     <div className="card battle-lobby-card">
+      {lobbyBlockOverlay && (
+        <div
+          className="lobby-block-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="lobby-block-title"
+        >
+          <div className="lobby-block-card">
+            <span className="lobby-block-kicker">Battle already active</span>
+            <h2 id="lobby-block-title">{lobbyBlockOverlay.title}</h2>
+            <p>{lobbyBlockOverlay.message}</p>
+
+            <button
+              type="button"
+              className="btn-primary lobby-block-button"
+              onClick={() => setLobbyBlockOverlay(null)}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
       <section className="battle-lobby-hero">
         <div className="battle-lobby-hero-copy">
           <div className="battle-lobby-hero-topline">

@@ -407,6 +407,78 @@ function getFriendlyUploadError(message?: string | null): string {
 }
 
 
+const MAX_BATTLE_UPLOAD_BYTES = 100 * 1024 * 1024;
+const BATTLE_UPLOAD_RETRY_DELAYS_MS = [0, 900, 2200];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function getErrorMessage(error: unknown): string {
+  if (!error) return "";
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message ?? "");
+  }
+  return String(error);
+}
+
+function isLikelyTemporaryUploadError(error: unknown): boolean {
+  const normalized = getErrorMessage(error).toLowerCase();
+
+  return (
+    normalized.includes("failed to fetch") ||
+    normalized.includes("network") ||
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("temporarily") ||
+    normalized.includes("econnreset") ||
+    normalized.includes("etimedout") ||
+    normalized.includes("rate limit") ||
+    normalized.includes("too many requests") ||
+    normalized.includes("500") ||
+    normalized.includes("502") ||
+    normalized.includes("503") ||
+    normalized.includes("504")
+  );
+}
+
+function getBattleUploadExtension(file: File): string {
+  const safeName = file.name
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_");
+
+  const rawExtension = safeName.includes(".")
+    ? safeName.split(".").pop()
+    : "webm";
+
+  const extension = (rawExtension || "webm").toLowerCase();
+
+  if (/^[a-z0-9]{1,8}$/.test(extension)) return extension;
+  return "webm";
+}
+
+function isSupportedBattleAudioFile(file: File): boolean {
+  if (file.type && file.type.startsWith("audio/")) return true;
+
+  // Mobile browsers sometimes provide an empty MIME type, so allow common audio extensions too.
+  return /\.(mp3|wav|m4a|aac|ogg|oga|flac|webm|aif|aiff)$/i.test(file.name);
+}
+
+function makeBattleUploadPath(userId: string, battleId: string, file: File): string {
+  const extension = getBattleUploadExtension(file);
+  const randomPart =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  // Use a unique object path for every attempt instead of overwriting the same object.
+  // This avoids storage overwrite/RLS/CDN edge cases and makes retries safer.
+  return `${userId}/${battleId}/${Date.now()}-${randomPart}.${extension}`;
+}
+
+
 type LobbyBlockOverlay = {
   title: string;
   message: string;
@@ -424,21 +496,6 @@ function isLobbyBlockError(message?: string | null): boolean {
     normalized.includes("previous lobby") ||
     normalized.includes("already in a lobby")
   );
-}
-
-function getErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof Error && err.message) return err.message;
-
-  if (
-    err &&
-    typeof err === "object" &&
-    "message" in err &&
-    typeof (err as { message?: unknown }).message === "string"
-  ) {
-    return (err as { message: string }).message;
-  }
-
-  return fallback;
 }
 
 
@@ -2084,6 +2141,16 @@ setLoadingSubmissions(false);
       return;
     }
 
+    if (!isSupportedBattleAudioFile(file)) {
+      setUploadError("Please choose a valid audio file before uploading.");
+      return;
+    }
+
+    if (file.size > MAX_BATTLE_UPLOAD_BYTES) {
+      setUploadError("This file is too large. Please upload an audio file under 100 MB.");
+      return;
+    }
+
     const clearUploadProgressTimer = () => {
       if (uploadProgressTimerRef.current !== null) {
         window.clearInterval(uploadProgressTimerRef.current);
@@ -2110,6 +2177,38 @@ setLoadingSubmissions(false);
         });
       }, 420);
     };
+
+    const markSubmissionComplete = async (userId: string) => {
+      setUploadProgress(100);
+      setUploadDone(true);
+      setSubmittedUserIds((prev) => {
+        const next = new Set(prev);
+        next.add(userId);
+        return next;
+      });
+      await refreshLobbyState();
+    };
+
+    const verifyExistingSubmission = async (userId: string): Promise<boolean> => {
+      const { data, error } = await supabase
+        .from("battle_submissions")
+        .select("id")
+        .eq("battle_id", battleId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.warn("Could not verify existing submission after upload issue:", error);
+        return false;
+      }
+
+      if (!data) return false;
+
+      await markSubmissionComplete(userId);
+      return true;
+    };
+
+    let uploadUserId: string | null = null;
 
     setUploading(true);
     setUploadProgress(6);
@@ -2151,78 +2250,124 @@ setLoadingSubmissions(false);
         throw new Error("You must be logged in to upload.");
       }
 
+      uploadUserId = user.id;
+
+      const alreadySubmitted = await verifyExistingSubmission(user.id);
+      if (alreadySubmitted) return;
+
       setUploadProgress(24);
 
-      const safeName = file.name
-        .replace(/[^a-zA-Z0-9._-]/g, "_")
-        .replace(/_+/g, "_");
-      const extension = safeName.includes(".")
-        ? safeName.split(".").pop()
-        : "webm";
-
-      // Stable path per user + battle. This lets a player replace their upload
-      // without creating a second DB row or orphaning new timestamped files.
-      const path = `${user.id}/${battleId}/submission.${extension}`;
+      let uploadedPath: string | null = null;
+      let finalUploadError: unknown = null;
 
       beginUploadProgressDrift();
 
-      const { error: uploadErr } = await supabase.storage
-        .from("battle-audio")
-        .upload(path, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
+      for (let attemptIndex = 0; attemptIndex < BATTLE_UPLOAD_RETRY_DELAYS_MS.length; attemptIndex += 1) {
+        const delayMs = BATTLE_UPLOAD_RETRY_DELAYS_MS[attemptIndex];
+
+        if (delayMs > 0) {
+          await sleep(delayMs);
+        }
+
+        const path = makeBattleUploadPath(user.id, battleId, file);
+
+        setUploadProgress((prev) => Math.max(prev, Math.min(36 + attemptIndex * 12, 78)));
+
+        const { error: uploadErr } = await supabase.storage
+          .from("battle-audio")
+          .upload(path, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type || undefined,
+          });
+
+        if (!uploadErr) {
+          uploadedPath = path;
+          finalUploadError = null;
+          break;
+        }
+
+        finalUploadError = uploadErr;
+        console.warn(`Storage upload attempt ${attemptIndex + 1} failed:`, uploadErr);
+
+        if (!isLikelyTemporaryUploadError(uploadErr)) {
+          break;
+        }
+      }
 
       clearUploadProgressTimer();
 
-      if (uploadErr) {
-        console.error("Storage upload error:", uploadErr);
-        setUploadError(getFriendlyUploadError(uploadErr.message));
+      if (!uploadedPath) {
+        console.error("Storage upload failed after retries:", finalUploadError);
+        setUploadError(getFriendlyUploadError(getErrorMessage(finalUploadError)));
         setUploadProgress(0);
         return;
       }
 
       setUploadProgress(90);
 
-      const { error: submissionErr } = await supabase
-        .from("battle_submissions")
-        .upsert(
-          {
-            battle_id: battleId,
-            user_id: user.id,
-            audio_path: path,
-            created_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "battle_id,user_id",
-          }
-        );
+      let finalSubmissionError: unknown = null;
 
-      if (submissionErr) {
-        console.error("DB submission upsert error:", submissionErr);
+      for (let attemptIndex = 0; attemptIndex < BATTLE_UPLOAD_RETRY_DELAYS_MS.length; attemptIndex += 1) {
+        const delayMs = BATTLE_UPLOAD_RETRY_DELAYS_MS[attemptIndex];
+
+        if (delayMs > 0) {
+          await sleep(delayMs);
+        }
+
+        setUploadProgress((prev) => Math.max(prev, Math.min(92 + attemptIndex * 2, 96)));
+
+        const { error: submissionErr } = await supabase
+          .from("battle_submissions")
+          .upsert(
+            {
+              battle_id: battleId,
+              user_id: user.id,
+              audio_path: uploadedPath,
+              created_at: new Date().toISOString(),
+            },
+            {
+              onConflict: "battle_id,user_id",
+            }
+          );
+
+        if (!submissionErr) {
+          finalSubmissionError = null;
+          break;
+        }
+
+        finalSubmissionError = submissionErr;
+        console.warn(`DB submission attempt ${attemptIndex + 1} failed:`, submissionErr);
+
+        const submissionActuallySaved = await verifyExistingSubmission(user.id);
+        if (submissionActuallySaved) return;
+
+        if (!isLikelyTemporaryUploadError(submissionErr)) {
+          break;
+        }
+      }
+
+      if (finalSubmissionError) {
+        console.error("DB submission upsert failed after retries:", finalSubmissionError);
         setUploadError(
-          `Database error: ${submissionErr.message ?? "unknown error"}`
+          `Database error: ${getErrorMessage(finalSubmissionError) || "unknown error"}`
         );
         setUploadProgress(0);
         return;
       }
 
-      setUploadProgress(96);
-
-      setUploadDone(true);
-      setSubmittedUserIds((prev) => {
-        const next = new Set(prev);
-        next.add(user.id);
-        return next;
-      });
-
-      await refreshLobbyState();
-
-      setUploadProgress(100);
+      setUploadProgress(98);
+      await markSubmissionComplete(user.id);
 // Do NOT immediately switch to results.
 // Stay on this screen until the shared lobby status changes to "voting" or "finished".
     } catch (err: any) {
       console.error("Unexpected upload error:", err);
+
+      if (uploadUserId) {
+        const submissionActuallySaved = await verifyExistingSubmission(uploadUserId);
+        if (submissionActuallySaved) return;
+      }
+
       setUploadError(getFriendlyUploadError(err?.message));
       setUploadProgress(0);
     } finally {

@@ -1,11 +1,25 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
+const mobileNavItems = [
+  { href: "/battles", label: "Battles", icon: "⚔" },
+  { href: "/leaderboard", label: "Board", icon: "▤" },
+  { href: "/profile", label: "Profile", icon: "◆" },
+  { href: "/report", label: "Support", icon: "?" },
+];
+
+function isActiveMobilePath(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export default function NavBar() {
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -42,6 +56,7 @@ export default function NavBar() {
   const displayName = user?.email?.split("@")[0] ?? "Producer";
 
   return (
+    <>
     <nav className="nav nav-pro">
       <div className="nav-pro-main">
         <Link href="/" className="logo nav-pro-logo" onClick={closeMenu}>
@@ -98,5 +113,27 @@ export default function NavBar() {
         </div>
       </div>
     </nav>
+
+    <div className="mobile-bottom-nav" role="navigation" aria-label="Mobile primary navigation">
+      {mobileNavItems.map((item) => {
+        const isActive = isActiveMobilePath(pathname, item.href);
+
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={isActive ? "mobile-bottom-nav-link mobile-bottom-nav-link-active" : "mobile-bottom-nav-link"}
+            onClick={closeMenu}
+            aria-current={isActive ? "page" : undefined}
+          >
+            <span className="mobile-bottom-nav-icon" aria-hidden="true">
+              {item.icon}
+            </span>
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+    </>
   );
 }

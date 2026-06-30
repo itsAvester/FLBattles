@@ -842,6 +842,7 @@ const submittedUsersLoadedRef = useRef(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatMuted, setChatMuted] = useState(false);
   const [chatMuteLoaded, setChatMuteLoaded] = useState(false);
+  const [chatCollapsed, setChatCollapsed] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const lastChatSentAtRef = useRef<number>(0);
 
@@ -3302,13 +3303,28 @@ useEffect(() => {
               </div>
 
               {chatEnabled && (
-                <aside className="battle-chat-card" aria-label="Lobby chat">
+                <aside
+                  className={`battle-chat-card ${
+                    chatCollapsed ? "battle-chat-card-collapsed" : ""
+                  }`}
+                  aria-label="Lobby chat"
+                >
                   <div className="battle-chat-head">
                     <div>
                       <p className="battle-lobby-section-label">Lobby chat</p>
                       <h4 className="battle-chat-title">Room talk</h4>
                     </div>
-                    <span className="battle-chat-live-pill">Live</span>
+                    <div className="battle-chat-head-actions">
+                      <span className="battle-chat-live-pill">Live</span>
+                      <button
+                        type="button"
+                        className="battle-chat-collapse-button"
+                        onClick={() => setChatCollapsed((current) => !current)}
+                        aria-expanded={!chatCollapsed}
+                      >
+                        {chatCollapsed ? "Open" : "Hide"}
+                      </button>
+                    </div>
                   </div>
 
                   <div ref={chatScrollRef} className="battle-chat-message-list">

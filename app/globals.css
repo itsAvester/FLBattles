@@ -15206,3 +15206,554 @@ button.battle-custom-segment-active:hover {
   text-transform: none;
   letter-spacing: 0.01em;
 }
+
+
+/* =========================================================
+   MOBILE RESPONSIVE LAYER — FLBATTLES
+   Desktop remains the base layout. These rules only activate
+   on tablet/phone widths and add an app-style bottom nav.
+   ========================================================= */
+
+.mobile-bottom-nav {
+  display: none;
+}
+
+.battle-chat-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.battle-chat-collapse-button {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .page-inner,
+  .battle-app-shell,
+  .leaderboard-app-shell,
+  .fl-home-hero-grid,
+  .fl-home-mode-section,
+  .fl-home-final-strip {
+    width: min(100% - 28px, 1180px) !important;
+  }
+
+  .fl-home-hero-grid,
+  .hero-grid,
+  .battles-grid,
+  .battle-app-header,
+  .battle-app-panel-inner,
+  .leaderboard-app-header,
+  .leaderboard-app-panel-inner,
+  .battle-production-grid,
+  .battle-results-summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .fl-home-side-panel,
+  .battle-window,
+  .battles-window {
+    max-width: 100% !important;
+  }
+
+  .battle-lobby-hero,
+  .battle-lobby-status-heading-row,
+  .battle-production-topbar,
+  .battle-results-hero,
+  .battle-results-section-header,
+  .battle-results-track-header {
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
+  }
+
+  .battle-lobby-live-area,
+  .battle-lobby-live-area-with-chat,
+  .battle-lobby-live-area-production,
+  .battle-podium-grid,
+  .leaderboard-app-podium-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html {
+    scroll-padding-bottom: 92px;
+  }
+
+  body {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+
+  .page {
+    min-width: 0;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 400;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at 0% 0%, rgba(255, 77, 28, 0.18), transparent 36%),
+      rgba(5, 5, 5, 0.94);
+    box-shadow:
+      0 18px 50px rgba(0, 0, 0, 0.58),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+    backdrop-filter: blur(18px);
+  }
+
+  .mobile-bottom-nav-link {
+    min-width: 0;
+    min-height: 54px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 4px;
+    padding: 6px 4px;
+    border: 1px solid transparent;
+    border-radius: 16px;
+    color: rgba(244, 241, 232, 0.58);
+    font-size: 0.62rem;
+    font-weight: 950;
+    line-height: 1;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .mobile-bottom-nav-icon {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 22px;
+    color: currentColor;
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .mobile-bottom-nav-link-active {
+    border-color: rgba(255, 77, 28, 0.42);
+    background:
+      radial-gradient(circle at 50% 0%, rgba(255, 77, 28, 0.2), transparent 62%),
+      rgba(255, 77, 28, 0.08);
+    color: var(--text);
+  }
+
+  .nav.nav-pro {
+    padding: 12px 14px !important;
+  }
+
+  .nav-pro-links-open {
+    max-height: calc(100dvh - 94px);
+    overflow-y: auto;
+  }
+
+  .beta-banner {
+    display: grid !important;
+    grid-template-columns: auto 1fr !important;
+    gap: 8px !important;
+    padding: 8px 14px !important;
+    font-size: 0.72rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .beta-pill {
+    white-space: nowrap;
+  }
+
+  .site-footer {
+    padding-bottom: 12px;
+  }
+
+  .site-footer-bottom {
+    padding-bottom: 14px;
+  }
+
+  /* Home */
+  .fl-home-hero,
+  .retro-hero,
+  .battles-hero {
+    min-height: 0 !important;
+    padding-top: 34px !important;
+    padding-bottom: 34px !important;
+  }
+
+  .fl-home-hero-grid,
+  .fl-home-proof-row,
+  .fl-home-mode-grid,
+  .feature-grid,
+  .battle-option-grid,
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .fl-home-copy h1,
+  .fl-home-headline,
+  .hero-copy h1,
+  .battles-copy h1,
+  .battle-app-header h1,
+  .leaderboard-app-title-block h1 {
+    font-size: clamp(2.75rem, 15vw, 4.45rem) !important;
+    line-height: 0.9 !important;
+  }
+
+  .fl-home-actions,
+  .hero-actions,
+  .battle-mode-actions {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .fl-home-actions a,
+  .hero-actions a,
+  .battle-mode-actions button,
+  .battle-app-submit-sample,
+  .battle-app-primary-button,
+  .leaderboard-app-cta,
+  .btn-primary,
+  .btn-secondary {
+    width: 100%;
+  }
+
+  .fl-home-proof-row > div,
+  .stat-box,
+  .battle-app-meta-grid div,
+  .leaderboard-app-stat-tile,
+  .battle-lobby-stat-card {
+    min-height: 72px !important;
+  }
+
+  /* Battles hub */
+  .battle-app-page,
+  .leaderboard-app-page {
+    padding-top: 18px !important;
+    padding-bottom: 30px !important;
+    overflow: visible !important;
+  }
+
+  .battle-app-header,
+  .leaderboard-app-header {
+    gap: 12px !important;
+  }
+
+  .battle-app-header p,
+  .leaderboard-app-title-block p {
+    font-size: 0.9rem !important;
+  }
+
+  .battle-app-tabs,
+  .leaderboard-app-tabs {
+    display: flex !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    padding-bottom: 4px !important;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .battle-app-tabs::-webkit-scrollbar,
+  .leaderboard-app-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .battle-app-tab,
+  .leaderboard-app-tab {
+    min-width: min(82vw, 310px) !important;
+    min-height: 68px !important;
+    flex: 0 0 auto !important;
+    scroll-snap-align: start;
+  }
+
+  .battle-app-panel,
+  .leaderboard-app-panel,
+  .battle-results-shell,
+  .battle-lobby-card {
+    border-radius: 18px !important;
+  }
+
+  .battle-app-panel-inner,
+  .leaderboard-app-panel-inner {
+    gap: 16px !important;
+    padding: 16px !important;
+  }
+
+  .battle-app-panel h2,
+  .leaderboard-app-panel-main h2,
+  .battle-results-hero h2,
+  .battle-production-title,
+  .battle-lobby-title {
+    font-size: clamp(2.1rem, 11vw, 3.35rem) !important;
+    line-height: 0.92 !important;
+  }
+
+  .battle-app-meta-grid,
+  .battle-app-custom-grid,
+  .leaderboard-app-meta-grid,
+  .leaderboard-app-search,
+  .battle-lobby-stat-grid,
+  .battle-results-summary-grid,
+  .leaderboard-app-mini-stat-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .battle-app-chip-row,
+  .leaderboard-app-chip-row {
+    justify-content: flex-start !important;
+  }
+
+  .battle-app-field input,
+  .battle-app-field select,
+  .leaderboard-app-search input {
+    min-height: 48px !important;
+    font-size: 16px !important;
+  }
+
+  /* Live battle room */
+  .battle-lobby-card {
+    width: min(100% - 20px, 760px) !important;
+    margin: 12px auto 0 !important;
+    overflow: hidden;
+  }
+
+  .battle-lobby-hero,
+  .battle-lobby-status-box,
+  .battle-lobby-player-list-card,
+  .battle-lobby-matchmaking-card,
+  .battle-production-panel,
+  .battle-production-panel-inline,
+  .battle-sample-card,
+  .battle-upload-card,
+  .battle-chat-card,
+  .battle-voting-panel,
+  .sample-box {
+    padding: 14px !important;
+  }
+
+  .battle-lobby-hero-topline,
+  .battle-lobby-status-heading-row,
+  .battle-production-topbar,
+  .battle-results-eyebrow-row,
+  .battle-results-report-row {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .battle-lobby-id-value {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal !important;
+  }
+
+  .battle-lobby-top-timer,
+  .battle-production-timer,
+  .battle-lobby-status-chip {
+    width: 100% !important;
+    min-width: 0 !important;
+    text-align: left !important;
+  }
+
+  .battle-lobby-player-chip-row {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .battle-lobby-player-chip {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .battle-sample-card-head,
+  .battle-upload-card-head,
+  .battle-chat-head {
+    align-items: flex-start !important;
+  }
+
+  .battle-upload-button,
+  .custom-lobby-create-button,
+  .leave-btn {
+    width: 100% !important;
+  }
+
+  .leave-btn {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .battle-chat-card {
+    max-height: none !important;
+    min-height: 0 !important;
+  }
+
+  .battle-chat-collapse-button {
+    min-height: 26px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 9px !important;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.045);
+    color: var(--muted);
+    font-size: 0.62rem;
+    font-weight: 950;
+    line-height: 1;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    box-shadow: none;
+  }
+
+  .battle-chat-collapse-button:hover {
+    transform: none !important;
+    color: var(--text);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .battle-chat-card-collapsed {
+    max-height: none !important;
+  }
+
+  .battle-chat-card-collapsed .battle-chat-message-list,
+  .battle-chat-card-collapsed .battle-chat-form,
+  .battle-chat-card-collapsed .battle-chat-foot,
+  .battle-chat-card-collapsed .battle-chat-error {
+    display: none !important;
+  }
+
+  .battle-chat-message-list {
+    max-height: 250px !important;
+  }
+
+  .battle-chat-form {
+    grid-template-columns: 1fr auto !important;
+  }
+
+  .battle-chat-form input {
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .battle-chat-form button {
+    width: auto !important;
+  }
+
+  .battle-production-muted,
+  .battle-production-description,
+  .battle-chat-message p,
+  .battle-results-hero p {
+    font-size: 0.88rem !important;
+  }
+
+  /* Voting/results */
+  .battle-voting-panel audio,
+  .battle-result-audio-player {
+    width: 100% !important;
+  }
+
+  .results-list {
+    padding-left: 0 !important;
+    list-style-position: inside;
+  }
+
+  .battle-podium-grid,
+  .battle-results-track-list,
+  .leaderboard-app-podium-grid {
+    gap: 10px !important;
+  }
+
+  .battle-result-track-card,
+  .podium-card,
+  .leaderboard-app-podium-card {
+    border-radius: 16px !important;
+  }
+
+  .battle-result-track-topline,
+  .leaderboard-app-podium-topline,
+  .podium-name-row {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* Leaderboard table keeps rank correct but becomes horizontally scrollable. */
+  .leaderboard-app-table-card {
+    overflow: hidden !important;
+  }
+
+  .leaderboard-table-wrap,
+  .leaderboard-app-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .leaderboard-table-wrap table,
+  .leaderboard-app-table-wrap table {
+    min-width: 650px !important;
+  }
+
+  .leaderboard-app-search {
+    grid-template-columns: 1fr !important;
+  }
+
+  .leaderboard-app-search button {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .page-inner,
+  .battle-app-shell,
+  .leaderboard-app-shell {
+    width: min(100% - 20px, 1180px) !important;
+  }
+
+  .mobile-bottom-nav {
+    left: 6px;
+    right: 6px;
+    bottom: max(6px, env(safe-area-inset-bottom));
+    border-radius: 18px;
+  }
+
+  .mobile-bottom-nav-link {
+    min-height: 50px;
+    font-size: 0.56rem;
+  }
+
+  .fl-home-copy h1,
+  .fl-home-headline,
+  .battle-app-header h1,
+  .leaderboard-app-title-block h1 {
+    font-size: clamp(2.45rem, 14vw, 3.6rem) !important;
+  }
+
+  .battle-app-panel-inner,
+  .leaderboard-app-panel-inner,
+  .battle-lobby-hero,
+  .battle-lobby-status-box,
+  .battle-lobby-player-list-card,
+  .battle-lobby-matchmaking-card,
+  .battle-production-panel,
+  .battle-sample-card,
+  .battle-upload-card,
+  .battle-chat-card,
+  .battle-voting-panel,
+  .sample-box {
+    padding: 12px !important;
+  }
+
+  .battle-chat-form {
+    grid-template-columns: 1fr !important;
+  }
+
+  .battle-chat-form button {
+    width: 100% !important;
+  }
+}
